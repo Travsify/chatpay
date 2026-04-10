@@ -79,7 +79,7 @@ export class AdminController {
             await prisma.webhookLog.create({
                 data: {
                     direction: 'OUTBOUND',
-                    status: 'SUCCESS',
+                    status: 'PROCESSED',
                     phoneNumber: phoneNumber,
                     payload: JSON.stringify(result)
                 }
@@ -92,7 +92,7 @@ export class AdminController {
             await prisma.webhookLog.create({
                 data: {
                     direction: 'OUTBOUND',
-                    status: 'ERROR',
+                    status: 'FAILED',
                     phoneNumber: req.body.phoneNumber || 'UNKNOWN',
                     payload: JSON.stringify(error.response?.data || {}),
                     errorMsg: error.message
