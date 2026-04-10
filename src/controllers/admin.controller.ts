@@ -3,6 +3,7 @@ import prisma from '../utils/prisma.js';
 import { AuthRequest } from '../middleware/auth.middleware.js';
 import { PremblyService } from '../services/prembly.service.js';
 import { WalletService } from '../services/wallet.service.js';
+import { whapiService } from '../services/whapi.service.js';
 
 export class AdminController {
 
@@ -54,8 +55,6 @@ export class AdminController {
             console.error('Config Update Error:', error);
             res.status(500).json({ error: 'Failed to update system configuration' });
         }
-    }
-
     }
 
     static async syncWhapiWebhook(req: AuthRequest, res: Response) {

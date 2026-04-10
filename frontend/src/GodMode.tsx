@@ -319,26 +319,6 @@ const OverviewTab = ({ api }: { api: any }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-xl font-black text-white">API Vault</h2>
-          <p className="text-sm text-[#8696a0]">Manage your mission-critical secret keys</p>
-        </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={syncWebhook}
-            className="bg-[#222d34] hover:bg-[#2a3942] text-white px-4 py-2 rounded-xl border border-[#222d34] flex items-center gap-2 text-sm font-bold transition-all"
-          >
-            <RefreshCw size={16} /> Sync Webhook
-          </button>
-          <button 
-            onClick={saveConfig}
-            className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] hover:text-white px-6 py-2 rounded-xl flex items-center gap-2 font-bold transition-all shadow-[0_0_15px_rgba(37,211,102,0.3)]"
-          >
-            <Save size={16} /> Save Configuration
-          </button>
-        </div>
-      </div>
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
