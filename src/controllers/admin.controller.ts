@@ -14,7 +14,6 @@ export class AdminController {
                     data: {
                         id: 'global',
                         whatsappNumber: '2348026990956',
-                        premblyAppId: '',
                         premblySecret: '',
                         openaiKey: '',
                         fincraSecret: '',
@@ -35,7 +34,6 @@ export class AdminController {
             // Only update fields that exist
             const updateData: any = {};
             if (data.whatsappNumber !== undefined) updateData.whatsappNumber = data.whatsappNumber;
-            if (data.premblyAppId !== undefined) updateData.premblyAppId = data.premblyAppId;
             if (data.premblySecret !== undefined) updateData.premblySecret = data.premblySecret;
             if (data.openaiKey !== undefined) updateData.openaiKey = data.openaiKey;
             if (data.fincraSecret !== undefined) updateData.fincraSecret = data.fincraSecret;

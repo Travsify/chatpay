@@ -106,7 +106,6 @@ model VirtualAccount {
 model SystemConfig {
   id              String   @id @default("global")
   whatsappNumber  String?
-  premblyAppId    String?
   premblySecret   String?
   openaiKey       String?
   fincraSecret      String?

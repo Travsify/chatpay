@@ -5,7 +5,6 @@ export class PremblyService {
     private static async getCredentials() {
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
         return {
-            appId: config?.premblyAppId || process.env.PREMBLY_APP_ID,
             secretKey: config?.premblySecret || process.env.PREMBLY_SECRET_KEY,
             baseUrl: 'https://api.prembly.com/identitypass/verification'
         };
@@ -18,9 +17,9 @@ export class PremblyService {
      */
     static async verifyCAC(rcNumber: string, companyName?: string) {
         try {
-            const { appId, secretKey, baseUrl } = await this.getCredentials();
+            const { secretKey, baseUrl } = await this.getCredentials();
             
-            if (!appId || !secretKey) {
+            if (!secretKey) {
                 console.log('[PREMBLY] API Keys missing. Mocking success...');
                 return {
                     status: true,
@@ -42,7 +41,6 @@ export class PremblyService {
             }, {
                 headers: {
                     'x-api-key': secretKey,
-                    'app-id': appId,
                     'Content-Type': 'application/json'
                 }
             });

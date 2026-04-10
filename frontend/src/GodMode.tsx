@@ -1054,7 +1054,6 @@ const SettingsTab = ({ api }: { api: any }) => {
 const ApiVault = ({ api }: { api: any }) => {
   const [config, setConfig] = useState<any>({
     whatsappNumber: '',
-    premblyAppId: '',
     premblySecret: '',
     openaiKey: '',
     fincraSecret: '',
@@ -1125,7 +1124,7 @@ const ApiVault = ({ api }: { api: any }) => {
           />
         </div>
 
-        {/* Prembly */}
+        {/* Prembly (Identitypass) */}
         <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
           <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
             <User size={14} className="text-[#25D366]" /> Prembly (Identitypass)
@@ -1133,14 +1132,8 @@ const ApiVault = ({ api }: { api: any }) => {
           <div className="space-y-3">
              <div className="relative">
                 <input
-                  type={visibleKeys.premblyAppId ? "text" : "password"} name="premblyAppId" value={config.premblyAppId || ''} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="App ID"
-                />
-             </div>
-             <div className="relative">
-                <input
                   type={visibleKeys.premblySecret ? "text" : "password"} name="premblySecret" value={config.premblySecret || ''} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="API Key"
                 />
                 <button type="button" onClick={() => toggleVisibility('premblySecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
                    {visibleKeys.premblySecret ? <EyeOff size={16} /> : <Eye size={16} />}
