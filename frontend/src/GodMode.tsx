@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Wallet, ShieldCheck, FileText, Send, User, TrendingUp,
+  Wallet, ShieldCheck, User, TrendingUp,
   Activity, MessageSquare, Zap, Lock, LogOut, Search,
-  ChevronLeft, ChevronRight, Eye, Ban, CheckCircle, XCircle,
+  ChevronLeft, ChevronRight, Ban, CheckCircle, XCircle,
   Server, Database, Clock, Users, BarChart3, AlertTriangle,
-  RefreshCw, Filter, MessageCircle, Globe, Shield, Terminal,
+  RefreshCw, Globe, Shield, Terminal,
   ArrowUpRight, ArrowDownRight, Hash, Settings
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -54,14 +54,12 @@ const LoginPage = ({ onLogin }: { onLogin: (token: string, admin: any) => void }
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSetup, setIsSetup] = useState(false);
-  const [setupChecked, setSetupChecked] = useState(false);
 
   useEffect(() => {
     // Check if setup is needed
     axios.post(`${API_BASE}/api/auth/login`, { email: 'check', password: 'check' })
-      .catch(err => {
+      .catch(() => {
         // If we get 401, login exists. If server error, might need setup
-        setSetupChecked(true);
       });
   }, []);
 
@@ -409,7 +407,7 @@ const UsersTab = ({ api }: { api: any }) => {
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchUsers = useCallback(async (page = 1) => {
     setLoading(true);
@@ -739,7 +737,6 @@ const ConversationsTab = ({ api }: { api: any }) => {
 // ===== WEBHOOKS TAB =====
 const WebhooksTab = ({ api }: { api: any }) => {
   const [logs, setLogs] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({ page: 1, totalPages: 1 });
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -750,7 +747,7 @@ const WebhooksTab = ({ api }: { api: any }) => {
       if (statusFilter) params.set('status', statusFilter);
       const res = await api(`/api/admin/webhooks?${params}`);
       setLogs(res.data.logs);
-      setPagination(res.data.pagination);
+      // setPagination(res.data.pagination);
     } catch (e) { console.error(e); }
     setLoading(false);
   }, [api, statusFilter]);
@@ -1055,7 +1052,7 @@ const SettingsTab = ({ api }: { api: any }) => {
 
 // ===== MAIN GOD MODE COMPONENT =====
 const GodMode = () => {
-  const { token, admin, login, logout, api, isAuth } = useAuth();
+  const { admin, login, logout, api, isAuth } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
 
   if (!isAuth) {
