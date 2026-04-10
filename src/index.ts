@@ -26,6 +26,6 @@ app.post('/api/admin/verify-user', AdminController.verifyUser);
 // Webhook route for Whapi.cloud
 app.post('/webhook/whatsapp', WebhookController.handleIncoming);
 
-app.listen(PORT, () => {
+app.listen(PORT as number, '0.0.0.0', () => {
     console.log(`ChatPay Server is running on port ${PORT}`);
 });
