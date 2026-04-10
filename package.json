@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'npx ts-node' src/index.ts",
     "prebuild": "rm -rf dist",
-    "build": "tsc",
+    "build": "cd frontend && npm install && npm run build && cd .. && tsc",
     "postinstall": "npx prisma generate && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

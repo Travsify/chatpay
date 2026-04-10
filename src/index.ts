@@ -1,6 +1,7 @@
 import express from 'express';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import path from 'path';
 import { WebhookController } from './controllers/webhook.controller';
 import { AdminController } from './controllers/admin.controller';
 import cors from 'cors';
@@ -13,7 +14,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
 
-app.get('/', (req, res) => {
+// API Routes
+app.get('/api/status', (req, res) => {
     res.json({ message: 'Welcome to ChatPay API' });
 });
 
@@ -25,6 +27,14 @@ app.post('/api/admin/verify-user', AdminController.verifyUser);
 
 // Webhook route for Whapi.cloud
 app.post('/webhook/whatsapp', WebhookController.handleIncoming);
+
+// Serve Frontend
+const frontendPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendPath));
+
+app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+});
 
 app.listen(PORT as number, '0.0.0.0', () => {
     console.log(`ChatPay Server is running on port ${PORT}`);

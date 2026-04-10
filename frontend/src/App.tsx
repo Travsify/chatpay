@@ -317,6 +317,32 @@ const AdminDashboard = () => {
 );
 };
 
+const Home = () => (
+  <PageWrapper>
+    <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
+      <div className="w-24 h-24 bg-primary/20 rounded-full flex items-center justify-center mb-8 relative">
+         <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full" />
+         <Wallet size={48} className="text-primary relative z-10" />
+      </div>
+      <h1 className="text-5xl font-black mb-6 tracking-tighter title-gradient leading-tight">
+        The Future of <br/> WhatsApp Banking.
+      </h1>
+      <p className="text-text-muted text-lg mb-12 max-w-md mx-auto">
+        No apps to download. No passwords to remember. Instant transfers, payments, and invoices—all inside your favorite chat app.
+      </p>
+      
+      <a href="https://wa.me/2348000000000?text=Hi, I want to sign up for ChatPay" target="_blank" rel="noopener noreferrer" className="btn btn-primary py-5 px-10 text-lg rounded-2xl shadow-glow">
+        Open in WhatsApp
+      </a>
+      
+      <div className="mt-16 flex items-center gap-6 text-text-muted text-sm font-bold uppercase tracking-widest">
+         <div className="flex items-center gap-2"><Check className="text-success" size={16}/> CBN Licensed</div>
+         <div className="flex items-center gap-2"><Check className="text-success" size={16}/> NDIC Insured</div>
+      </div>
+    </div>
+  </PageWrapper>
+);
+
 function App() {
   const location = useLocation();
 
@@ -342,7 +368,7 @@ function App() {
           
           <div className="flex gap-2 items-center">
             <Link to="/admin" className="hidden md:block text-[10px] font-black text-text-muted hover:text-primary transition-colors uppercase tracking-[0.2em] px-4">God Mode</Link>
-            <Link to="/kyc" className="p-3 hover:bg-white/10 rounded-2xl transition-all border border-white/5"><ShieldCheck size={20} /></Link>
+            <Link to="/dashboard" className="p-3 hover:bg-white/10 rounded-2xl transition-all border border-white/5"><Wallet size={20} /></Link>
             <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 hover:border-primary/50 transition-colors cursor-pointer group">
               <User size={22} className="group-hover:text-primary transition-colors" />
             </div>
@@ -352,28 +378,13 @@ function App() {
         {/* Dynamic Route Transitions */}
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Home />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/kyc" element={<KYC />} />
             <Route path="/pay/:id" element={<Checkout />} />
             <Route path="/admin" element={<AdminDashboard />} />
           </Routes>
         </AnimatePresence>
-
-        {/* Global Action Menu */}
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 flex gap-4 bg-background/80 backdrop-blur-2xl px-6 py-4 rounded-3xl border border-white/10 shadow-2xl">
-           <button className="flex flex-col items-center gap-1 group">
-             <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-white scale-110 group-active:scale-90 transition-transform"><Send size={18} /></div>
-             <span className="text-[10px] font-black uppercase text-text-muted tracking-widest">Send</span>
-           </button>
-           <button className="flex flex-col items-center gap-1 group">
-             <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-text-muted group-active:scale-90 transition-transform"><Wallet size={18} /></div>
-             <span className="text-[10px] font-black uppercase text-text-muted tracking-widest">Cards</span>
-           </button>
-           <button className="flex flex-col items-center gap-1 group">
-             <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center text-text-muted group-active:scale-90 transition-transform"><User size={18} /></div>
-             <span className="text-[10px] font-black uppercase text-text-muted tracking-widest">Profile</span>
-           </button>
-        </div>
       </div>
     </div>
   );
