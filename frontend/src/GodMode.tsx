@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, Ban, CheckCircle, XCircle,
   Server, Database, Clock, Users, BarChart3, AlertTriangle,
   RefreshCw, Globe, Shield, Terminal,
-  ArrowUpRight, ArrowDownRight, Hash, Settings
+  ArrowUpRight, ArrowDownRight, Hash, Settings, Eye, EyeOff
 } from 'lucide-react';
 import { AreaChart, Area, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import axios from 'axios';
@@ -1045,6 +1045,169 @@ const SettingsTab = ({ api }: { api: any }) => {
           </button>
         </form>
       </div>
+      <ApiVault api={api} />
+    </div>
+  );
+};
+
+// ===== API VAULT COMPONENT =====
+const ApiVault = ({ api }: { api: any }) => {
+  const [config, setConfig] = useState<any>({
+    whatsappNumber: '',
+    premblyAppId: '',
+    premblySecret: '',
+    openaiKey: '',
+    fincraSecret: '',
+    whapiToken: ''
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState({ text: '', isError: false });
+  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    // Fetch current system config
+    api('/api/admin/config')
+      .then((res: any) => {
+        if(res.data) setConfig(res.data);
+        setLoading(false);
+      })
+      .catch((e: Error) => { console.error(e); setLoading(false); });
+  }, [api]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setConfig({ ...config, [e.target.name]: e.target.value });
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage({ text: '', isError: false });
+
+    try {
+      await api('/api/admin/config', { method: 'POST', data: config });
+      setMessage({ text: 'API Vault successfully synced to database', isError: false });
+    } catch (error) {
+      setMessage({ text: 'Failed to save configuration', isError: true });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleVisibility = (key: string) => {
+    setVisibleKeys({ ...visibleKeys, [key]: !visibleKeys[key] });
+  };
+
+  if (loading) return <div className="text-[#8696a0] text-sm py-4">Loading Vault...</div>;
+
+  return (
+    <div className="bg-[#111b21] border border-[#222d34] rounded-2xl p-6 mt-6">
+      <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+        <Shield size={20} className="text-[#25D366]" /> API Vault
+      </h2>
+      <p className="text-[#8696a0] text-xs mb-6">Securely manage your global API integration keys</p>
+
+      <form onSubmit={handleSave} className="space-y-5">
+        
+        {/* Support Number */}
+        <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+            <Globe size={14} className="text-blue-400" /> WhatsApp Support Number
+          </label>
+          <p className="text-xs text-[#8696a0] mb-3">Overrides the "Launch App" frontend link (e.g., 2348000000000)</p>
+          <input
+            type="text" name="whatsappNumber" value={config.whatsappNumber || ''} onChange={handleChange}
+            className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none"
+            placeholder="e.g. 2348000000000"
+          />
+        </div>
+
+        {/* Prembly */}
+        <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+            <User size={14} className="text-[#25D366]" /> Prembly (Identitypass)
+          </label>
+          <div className="space-y-3">
+             <div className="relative">
+                <input
+                  type={visibleKeys.premblyAppId ? "text" : "password"} name="premblyAppId" value={config.premblyAppId || ''} onChange={handleChange}
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="App ID"
+                />
+             </div>
+             <div className="relative">
+                <input
+                  type={visibleKeys.premblySecret ? "text" : "password"} name="premblySecret" value={config.premblySecret || ''} onChange={handleChange}
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
+                />
+                <button type="button" onClick={() => toggleVisibility('premblySecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                   {visibleKeys.premblySecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+             </div>
+          </div>
+        </div>
+
+        {/* OpenAI */}
+        <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+            <Terminal size={14} className="text-purple-400" /> OpenAI
+          </label>
+          <div className="relative">
+             <input
+               type={visibleKeys.openaiKey ? "text" : "password"} name="openaiKey" value={config.openaiKey || ''} onChange={handleChange}
+               className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="sk-..."
+             />
+             <button type="button" onClick={() => toggleVisibility('openaiKey')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                {visibleKeys.openaiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+             </button>
+          </div>
+        </div>
+
+        {/* Fincra */}
+        <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+            <Wallet size={14} className="text-amber-400" /> Fincra
+          </label>
+          <div className="relative">
+             <input
+               type={visibleKeys.fincraSecret ? "text" : "password"} name="fincraSecret" value={config.fincraSecret || ''} onChange={handleChange}
+               className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
+             />
+             <button type="button" onClick={() => toggleVisibility('fincraSecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                {visibleKeys.fincraSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+             </button>
+          </div>
+        </div>
+
+        {/* Whapi */}
+        <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+            <MessageSquare size={14} className="text-[#25D366]" /> Whapi.cloud
+          </label>
+          <div className="relative">
+             <input
+               type={visibleKeys.whapiToken ? "text" : "password"} name="whapiToken" value={config.whapiToken || ''} onChange={handleChange}
+               className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Token"
+             />
+             <button type="button" onClick={() => toggleVisibility('whapiToken')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                {visibleKeys.whapiToken ? <EyeOff size={16} /> : <Eye size={16} />}
+             </button>
+          </div>
+        </div>
+
+        {message.text && (
+          <div className={`p-3 rounded-lg text-sm font-medium ${message.isError ? 'bg-red-500/10 text-red-400' : 'bg-[#25D366]/10 text-[#25D366]'}`}>
+            {message.text}
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white py-3.5 rounded-xl font-bold text-sm transition-all hover:shadow-[0_0_20px_rgba(37,211,102,0.3)] disabled:opacity-50"
+        >
+          {saving ? 'Syncing...' : 'Save API Vault'}
+        </button>
+      </form>
     </div>
   );
 };

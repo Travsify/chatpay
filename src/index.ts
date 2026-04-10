@@ -43,6 +43,10 @@ app.get('/api/admin/metrics', authMiddleware, AdminController.getMetrics);
 app.get('/api/admin/analytics', authMiddleware, AdminController.getAnalytics);
 app.get('/api/admin/health', authMiddleware, AdminController.getSystemHealth);
 
+// System Configuration (API Vault)
+app.get('/api/admin/config', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.getSystemConfig);
+app.post('/api/admin/config', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.updateSystemConfig);
+
 // Transactions
 app.get('/api/admin/transactions', authMiddleware, AdminController.getTransactions);
 
@@ -50,6 +54,7 @@ app.get('/api/admin/transactions', authMiddleware, AdminController.getTransactio
 app.get('/api/admin/users', authMiddleware, AdminController.getUsers);
 app.get('/api/admin/users/:id', authMiddleware, AdminController.getUserDetail);
 app.post('/api/admin/users/:id/verify', authMiddleware, requireRole('SUPER_ADMIN', 'OPERATOR'), AdminController.verifyUser);
+app.post('/api/admin/users/:id/kyb-verify', authMiddleware, requireRole('SUPER_ADMIN', 'OPERATOR'), AdminController.verifyBusinessCac);
 app.post('/api/admin/users/:id/suspend', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.toggleSuspend);
 
 // KYC

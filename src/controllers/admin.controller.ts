@@ -4,6 +4,56 @@ import { AuthRequest } from '../middleware/auth.middleware';
 
 export class AdminController {
 
+    // ===== SYSTEM CONFIGURATION (API VAULT) =====
+    static async getSystemConfig(req: AuthRequest, res: Response) {
+        try {
+            let config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            if (!config) {
+                config = await prisma.systemConfig.create({
+                    data: {
+                        id: 'global',
+                        whatsappNumber: '',
+                        premblyAppId: '',
+                        premblySecret: '',
+                        openaiKey: '',
+                        fincraSecret: '',
+                        whapiToken: ''
+                    }
+                });
+            }
+            res.json(config);
+        } catch (error) {
+            console.error('Config Fetch Error:', error);
+            res.status(500).json({ error: 'Failed to fetch system configuration' });
+        }
+    }
+
+    static async updateSystemConfig(req: AuthRequest, res: Response) {
+        try {
+            const data = req.body;
+            // Only update fields that exist
+            const updateData: any = {};
+            if (data.whatsappNumber !== undefined) updateData.whatsappNumber = data.whatsappNumber;
+            if (data.premblyAppId !== undefined) updateData.premblyAppId = data.premblyAppId;
+            if (data.premblySecret !== undefined) updateData.premblySecret = data.premblySecret;
+            if (data.openaiKey !== undefined) updateData.openaiKey = data.openaiKey;
+            if (data.fincraSecret !== undefined) updateData.fincraSecret = data.fincraSecret;
+            if (data.whapiToken !== undefined) updateData.whapiToken = data.whapiToken;
+
+            const config = await prisma.systemConfig.upsert({
+                where: { id: 'global' },
+                update: updateData,
+                create: { id: 'global', ...updateData }
+            });
+
+            res.json({ message: 'System configuration updated successfully', config });
+        } catch (error) {
+            console.error('Config Update Error:', error);
+            res.status(500).json({ error: 'Failed to update system configuration' });
+        }
+    }
+
+
     // ===== DASHBOARD METRICS =====
     // GET /api/admin/metrics
     static async getMetrics(req: AuthRequest, res: Response) {
@@ -336,6 +386,60 @@ export class AdminController {
         } catch (error) {
             console.error('Verify user error:', error);
             res.status(500).json({ error: 'Failed to update user KYC' });
+        }
+    }
+
+    // POST /api/admin/users/:id/kyb-verify
+    static async verifyBusinessCac(req: AuthRequest, res: Response) {
+        const { rcNumber, companyName } = req.body;
+        const userId = req.params.id as string;
+
+        try {
+            if (!rcNumber) {
+                res.status(400).json({ error: 'RC Number is required' });
+                return;
+            }
+
+            // Call Prembly service
+            const { PremblyService } = await import('../services/prembly.service');
+            const premblyResult = await PremblyService.verifyCAC(rcNumber, companyName);
+
+            if (!premblyResult || !premblyResult.status) {
+                res.status(400).json({ error: 'Prembly verification failed. Invalid RC Number.' });
+                return;
+            }
+
+            // Save to BusinessKyb Table
+            const data = premblyResult.data;
+            const businessModel = await prisma.businessKyb.upsert({
+                where: { userId },
+                create: {
+                    userId,
+                    cacNumber: data.rc_number || rcNumber,
+                    companyName: data.company_name,
+                    directors: data.directors ? JSON.stringify(data.directors) : null,
+                    status: 'VERIFIED',
+                    verifiedAt: new Date()
+                },
+                update: {
+                    cacNumber: data.rc_number || rcNumber,
+                    companyName: data.company_name,
+                    directors: data.directors ? JSON.stringify(data.directors) : null,
+                    status: 'VERIFIED',
+                    verifiedAt: new Date()
+                }
+            });
+
+            // Elevate user's KYC tier automatically
+            await prisma.user.update({
+                where: { id: userId },
+                data: { kycStatus: 'VERIFIED', tier: 2 } // Tier 2 = KYB Verified
+            });
+
+            res.json({ message: 'Business successfully vetted and saved', business: businessModel });
+        } catch (error: any) {
+            console.error('Prembly KYB Error:', error.message);
+            res.status(500).json({ error: error.message || 'Failed to communicate with Prembly API' });
         }
     }
 

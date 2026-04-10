@@ -9,35 +9,36 @@ datasource db {
 
 // ===== CORE USER =====
 model User {
-  id               String   @id @default(uuid())
-  phoneNumber      String   @unique
+  id               String            @id @default(uuid())
+  phoneNumber      String            @unique
   name             String?
-  kycStatus        KycStatus @default(PENDING)
-  tier             Int      @default(0)
+  kycStatus        KycStatus         @default(PENDING)
+  tier             Int               @default(0)
   fincraWalletId   String?
   fincraCustomerId String?
-  suspended        Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  suspended        Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   transactions     Transaction[]
   sessions         Session[]
   conversations    ConversationLog[]
   virtualAccounts  VirtualAccount[]
+  businessKyb      BusinessKyb?
 }
 
 // ===== TRANSACTIONS =====
 model Transaction {
-  id          String   @id @default(uuid())
+  id          String            @id @default(uuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
   type        TransactionType
   amount      Float
-  currency    String   @default("NGN")
+  currency    String            @default("NGN")
   status      TransactionStatus @default(PENDING)
-  reference   String   @unique
-  provider    String   // FINCRA, FLUTTERWAVE
+  reference   String            @unique
+  provider    String // FINCRA, FLUTTERWAVE
   description String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime          @default(now())
 }
 
 // ===== SESSION STATE =====
@@ -46,46 +47,46 @@ model Session {
   userId       String
   user         User     @relation(fields: [userId], references: [id])
   currentState String   @default("START")
-  context      String?  // JSON string for step-specific data
+  context      String? // JSON string for step-specific data
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
 
 // ===== ADMIN USERS (God Mode Access) =====
 model AdminUser {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String    @id @default(uuid())
+  email        String    @unique
   passwordHash String
   name         String
   role         AdminRole @default(OPERATOR)
   lastLoginAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // ===== CONVERSATION LOGS (AI Chat History) =====
 model ConversationLog {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  direction   MessageDirection
-  message     String
-  intent      String?  // Detected AI intent
-  aiResponse  String?  // What the AI responded with
-  confidence  Float?   // AI confidence score
-  createdAt   DateTime @default(now())
+  id         String           @id @default(uuid())
+  userId     String
+  user       User             @relation(fields: [userId], references: [id])
+  direction  MessageDirection
+  message    String
+  intent     String? // Detected AI intent
+  aiResponse String? // What the AI responded with
+  confidence Float? // AI confidence score
+  createdAt  DateTime         @default(now())
 }
 
 // ===== WEBHOOK LOGS (Message Delivery Tracking) =====
 model WebhookLog {
-  id          String   @id @default(uuid())
+  id          String           @id @default(uuid())
   direction   MessageDirection
   phoneNumber String
-  payload     String   // JSON payload
-  status      WebhookStatus @default(RECEIVED)
+  payload     String // JSON payload
+  status      WebhookStatus    @default(RECEIVED)
   errorMsg    String?
   latencyMs   Int?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime         @default(now())
 }
 
 // ===== VIRTUAL ACCOUNTS =====
@@ -99,6 +100,33 @@ model VirtualAccount {
   provider      String   @default("FINCRA")
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
+}
+
+// ===== SYSTEM CONFIGURATION (API VAULT) =====
+model SystemConfig {
+  id              String   @id @default("global")
+  whatsappNumber  String?
+  premblyAppId    String?
+  premblySecret   String?
+  openaiKey       String?
+  fincraSecret    String?
+  whapiToken      String?
+  updatedAt       DateTime @updatedAt
+}
+
+// ===== BUSINESS KYB (PREMBLY) =====
+model BusinessKyb {
+  id              String    @id @default(uuid())
+  userId          String    @unique
+  user            User      @relation(fields: [userId], references: [id])
+  cacNumber       String
+  companyName     String?
+  directors       String?   // JSON array of verified directors
+  status          KycStatus @default(PENDING)
+  premblyRef      String?
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 // ===== ENUMS =====
