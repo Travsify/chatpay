@@ -410,7 +410,13 @@ const Home = () => {
   useEffect(() => {
     fetch('/api/config/public')
       .then(res => res.json())
-      .then(data => { if (data.whatsappNumber) setWaNumber(data.whatsappNumber) })
+      .then(data => { 
+        if (data.whatsappNumber) {
+          // Remove any non-digit characters like +, spaces, or dashes
+          const cleanNum = data.whatsappNumber.replace(/\D/g, '');
+          setWaNumber(cleanNum);
+        }
+      })
       .catch();
   }, []);
 

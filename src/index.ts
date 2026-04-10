@@ -30,12 +30,11 @@ app.get('/api/status', (req, res) => {
 // Front-end Public API Config
 app.get('/api/config/public', async (req, res) => {
     try {
-        const { PrismaClient } = await import('@prisma/client');
-        const prisma = new PrismaClient();
+        const prisma = (await import('./utils/prisma.js')).default;
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-        res.json({ whatsappNumber: config?.whatsappNumber || '2348000000000' });
+        res.json({ whatsappNumber: config?.whatsappNumber || '2348026990956' });
     } catch (e) {
-        res.json({ whatsappNumber: '2348000000000' });
+        res.json({ whatsappNumber: '2348026990956' });
     }
 });
 
