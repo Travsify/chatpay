@@ -3,10 +3,12 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { WebhookController } from './controllers/webhook.controller';
 import { AdminController } from './controllers/admin.controller';
+import cors from 'cors';
 
 dotenv.config();
 
 const app = express();
+app.use(cors());
 const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json());

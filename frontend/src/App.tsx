@@ -116,7 +116,26 @@ const Checkout = () => (
   </div>
 );
 
-const AdminDashboard = () => (
+import axios from 'axios';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+const AdminDashboard = () => {
+    const [metrics, setMetrics] = React.useState<any>(null);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        axios.get(`${API_BASE}/api/admin/metrics`)
+            .then(res => {
+                setMetrics(res.data);
+                setLoading(false);
+            })
+            .catch(err => console.error('Failed to fetch metrics', err));
+    }, []);
+
+    if (loading) return <div className="p-20 text-center animate-pulse">Initializing God Mode...</div>;
+
+    return (
   <div className="p-6">
     <div className="flex justify-between items-center mb-8">
       <div>
@@ -134,10 +153,10 @@ const AdminDashboard = () => (
     {/* Metric Cards */}
     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
       {[
-        { label: 'Total TPV', value: '₦4.2M', growth: '+12%', icon: Wallet, color: 'text-primary' },
-        { label: 'Active Users', value: '1,280', growth: '+5%', icon: User, color: 'text-secondary' },
-        { label: 'Successful KYC', value: '850', growth: '66%', icon: ShieldCheck, color: 'text-success' },
-        { label: 'AI Confidence', value: '98.2%', growth: 'Stable', icon: ShieldCheck, color: 'text-accent' },
+    { label: 'Total TPV', value: metrics.tpv, growth: '+12%', icon: Wallet, color: 'text-primary' },
+    { label: 'Active Users', value: metrics.totalUsers, growth: '+5%', icon: User, color: 'text-secondary' },
+    { label: 'Total Tx', value: metrics.totalTx, growth: 'Stable', icon: FileText, color: 'text-success' },
+    { label: 'AI Accuracy', value: metrics.aiAccuracy, growth: 'Stable', icon: ShieldCheck, color: 'text-accent' },
       ].map((m, i) => (
         <div key={i} className="glass-card p-6">
           <div className="flex justify-between items-start mb-4">
