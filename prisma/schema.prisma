@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String   @id @default(uuid())
+  phoneNumber      String   @unique
+  name             String?
+  kycStatus        KycStatus @default(PENDING)
+  tier             Int      @default(0)
+  fincraWalletId   String?
+  fincraCustomerId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  transactions     Transaction[]
+  sessions         Session[]
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        TransactionType
+  amount      Float
+  currency    String   @default("NGN")
+  status      TransactionStatus @default(PENDING)
+  reference   String   @unique
+  provider    String   // FINCRA, FLUTTERWAVE
+  description String?
+  createdAt   DateTime @default(now())
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  currentState String   @default("START")
+  context      Json?    // For storing step-specific data
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum KycStatus {
+  PENDING
+  VERIFIED
+  FAILED
+}
+
+enum TransactionType {
+  P2P_SEND
+  P2P_RECEIVE
+  BILL_PAYMENT
+  AIRTIME
+  FUNDING
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}

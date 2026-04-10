@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Build outputs
+dist/
+ChatSela-Frontend/dist/
+frontend/dist/
+
+# Database & Environment
+.env
+*.db
+*.db-journal
+
+# Prisma
+/prisma/migrations/
+
+# OS/IDEs
+.DS_Store
+.vscode/
+.idea/
