@@ -1110,7 +1110,7 @@ const ApiVault = ({ api }: { api: any }) => {
   };
 
   const sendTestMessage = async () => {
-    const phone = prompt("Enter your personal phone number (e.g. 23480...) to receive a test message:");
+    const phone = prompt("Enter your personal phone number (including country code, e.g. 23480...) to receive a test message:");
     if (!phone) return;
     try {
       await api('/api/admin/config/test-outbound', { method: 'POST', data: { phoneNumber: phone } });

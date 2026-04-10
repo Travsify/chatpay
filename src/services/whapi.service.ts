@@ -23,14 +23,18 @@ export class WhapiService {
 
     async sendMessage(to: string, body: string) {
         const token = await this.getToken();
-        if (!token || token === 'your_whapi_token_here') {
-            console.log(`[MOCK WHAPI] Sending to ${to}: ${body}`);
+        const cleanTo = to.replace(/\D/g, ''); // Ensure no +, spaces, etc.
+        
+        console.log(`[Whapi] Sending message to ${cleanTo} using token: ${token.substring(0, 5)}...`);
+        
+        if (!token || token === '' || token === 'your_whapi_token_here') {
+            console.log(`[MOCK WHAPI] Sending to ${cleanTo}: ${body}`);
             return { sent: true, mock: true };
         }
         try {
             const response = await axios.post(`${this.apiUrl}/messages/text`, {
                 typing_time: 0,
-                to: to,
+                to: cleanTo,
                 body: body
             }, {
                 headers: {
@@ -38,9 +42,10 @@ export class WhapiService {
                     'Content-Type': 'application/json'
                 }
             });
+            console.log(`[Whapi] Response Status: ${response.status} | Data:`, JSON.stringify(response.data));
             return response.data;
         } catch (error: any) {
-            console.error('Error sending Whapi message:', error.response?.data || error.message);
+            console.error('Whapi delivery failure:', error.response?.data || error.message);
             throw error;
         }
     }
