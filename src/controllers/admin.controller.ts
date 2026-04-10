@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { PremblyService } from '../services/prembly.service';
 
 export class AdminController {
 
@@ -404,7 +405,6 @@ export class AdminController {
             }
 
             // Call Prembly service
-            const { PremblyService } = await import('../services/prembly.service');
             const premblyResult = await PremblyService.verifyCAC(rcNumber, companyName);
 
             if (!premblyResult || !premblyResult.status) {
