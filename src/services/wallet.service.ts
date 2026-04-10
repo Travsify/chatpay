@@ -1,5 +1,5 @@
-import { fincraService } from './fincra.service';
-import prisma from '../utils/prisma';
+import { fincraService } from './fincra.service.js';
+import prisma from '../utils/prisma.js';
 
 export class WalletService {
     

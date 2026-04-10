@@ -3,10 +3,10 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import cors from 'cors';
-import { WebhookController } from './controllers/webhook.controller';
-import { AdminController } from './controllers/admin.controller';
-import { AuthController } from './controllers/auth.controller';
-import { authMiddleware, requireRole } from './middleware/auth.middleware';
+import { WebhookController } from './controllers/webhook.controller.js';
+import { AdminController } from './controllers/admin.controller.js';
+import { AuthController } from './controllers/auth.controller.js';
+import { authMiddleware, requireRole } from './middleware/auth.middleware.js';
 
 dotenv.config();
 

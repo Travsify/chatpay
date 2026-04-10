@@ -1,4 +1,5 @@
 import axios from 'axios';
+import prisma from '../utils/prisma.js';
 
 export class WhapiService {
     private apiUrl: string;
@@ -13,7 +14,6 @@ export class WhapiService {
         if (this.token && this.token !== '' && this.token !== 'your_whapi_token_here') return this.token;
         
         try {
-            const prisma = (await import('../utils/prisma')).default;
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
             return config?.whapiToken || this.token;
         } catch (e) {

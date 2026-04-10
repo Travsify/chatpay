@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { whapiService } from '../services/whapi.service';
-import { aiService } from '../services/ai.service';
-import { WalletService } from '../services/wallet.service';
-import prisma from '../utils/prisma';
+import { whapiService } from '../services/whapi.service.js';
+import { aiService } from '../services/ai.service.js';
+import { WalletService } from '../services/wallet.service.js';
+import prisma from '../utils/prisma.js';
 
 export class WebhookController {
     

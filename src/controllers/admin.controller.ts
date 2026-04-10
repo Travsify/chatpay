@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
-import prisma from '../utils/prisma';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { PremblyService } from '../services/prembly.service';
+import prisma from '../utils/prisma.js';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+import { PremblyService } from '../services/prembly.service.js';
 
 export class AdminController {
 

@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import prisma from '../utils/prisma.js';
 
 export interface IntentResult {
     intent: 'SIGNUP' | 'SEND_FUNDS' | 'PAY_BILL' | 'CHECK_BALANCE' | 'INVOICE' | 'UNKNOWN';
@@ -19,7 +20,6 @@ export class AiService {
         if (this.openai) return this.openai;
         
         try {
-            const prisma = (await import('../utils/prisma')).default;
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
             const key = config?.openaiKey || process.env.OPENAI_API_KEY;
             

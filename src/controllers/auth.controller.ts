@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import prisma from '../utils/prisma';
-import { generateToken, AuthRequest } from '../middleware/auth.middleware';
+import prisma from '../utils/prisma.js';
+import { generateToken, AuthRequest } from '../middleware/auth.middleware.js';
 
 export class AuthController {
 
