@@ -1,0 +1,25 @@
+services:
+  # Backend Service
+  - type: web
+    name: chatpay-backend
+    env: node
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: node dist/index.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18.16.0
+      - key: PORT
+        value: 10000
+      - fromGroup: chatpay-secrets
+
+  # Frontend Static Site
+  - type: static
+    name: chatpay-frontend
+    env: static
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    publishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://chatpay-backend.onrender.com
