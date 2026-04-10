@@ -32,7 +32,7 @@ app.post('/webhook/whatsapp', WebhookController.handleIncoming);
 const frontendPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendPath));
 
-app.get('*', (req, res) => {
+app.use((req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
