@@ -4,7 +4,7 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Wallet, ShieldCheck, FileText, Send, User, Copy, Check, TrendingUp, CreditCard, ChevronRight, ChevronDown, Briefcase, Users, Smartphone, Star } from 'lucide-react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
-import axios from 'axios';
+
 
 // --- ANIMATION HELPERS ---
 
@@ -199,7 +199,7 @@ const LiveChatMockup = () => {
 };
 
 // --- STYLES & CONFIG ---
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 
 const chartData = [
   { name: 'Mon', amount: 4000 },

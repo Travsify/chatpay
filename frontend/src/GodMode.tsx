@@ -407,7 +407,6 @@ const UsersTab = ({ api }: { api: any }) => {
   const [search, setSearch] = useState('');
   const [kycFilter, setKycFilter] = useState('');
   const [loading, setLoading] = useState(true);
-  const [loading, setLoading] = useState(true);
 
   const fetchUsers = useCallback(async (page = 1) => {
     setLoading(true);
