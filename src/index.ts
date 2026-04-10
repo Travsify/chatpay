@@ -57,6 +57,7 @@ app.get('/api/admin/health', authMiddleware, AdminController.getSystemHealth);
 // System Configuration (API Vault)
 app.get('/api/admin/config', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.getSystemConfig);
 app.post('/api/admin/config', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.updateSystemConfig);
+app.post('/api/admin/config/sync-webhook', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.syncWhapiWebhook);
 
 // Transactions
 app.get('/api/admin/transactions', authMiddleware, AdminController.getTransactions);

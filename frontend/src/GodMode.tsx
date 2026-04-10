@@ -319,6 +319,26 @@ const OverviewTab = ({ api }: { api: any }) => {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-xl font-black text-white">API Vault</h2>
+          <p className="text-sm text-[#8696a0]">Manage your mission-critical secret keys</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={syncWebhook}
+            className="bg-[#222d34] hover:bg-[#2a3942] text-white px-4 py-2 rounded-xl border border-[#222d34] flex items-center gap-2 text-sm font-bold transition-all"
+          >
+            <RefreshCw size={16} /> Sync Webhook
+          </button>
+          <button 
+            onClick={saveConfig}
+            className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] hover:text-white px-6 py-2 rounded-xl flex items-center gap-2 font-bold transition-all shadow-[0_0_15px_rgba(37,211,102,0.3)]"
+          >
+            <Save size={16} /> Save Configuration
+          </button>
+        </div>
+      </div>
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
@@ -1100,14 +1120,34 @@ const ApiVault = ({ api }: { api: any }) => {
     setVisibleKeys({ ...visibleKeys, [key]: !visibleKeys[key] });
   };
 
+  const syncWebhook = async () => {
+    try {
+      await api('/api/admin/config/sync-webhook', { method: 'POST' });
+      setMessage({ text: 'Whapi Webhook synchronized successfully!', isError: false });
+    } catch (err: any) {
+      setMessage({ text: err.response?.data?.error || 'Failed to sync webhook', isError: true });
+    }
+  };
+
   if (loading) return <div className="text-[#8696a0] text-sm py-4">Loading Vault...</div>;
 
   return (
     <div className="bg-[#111b21] border border-[#222d34] rounded-2xl p-6 mt-6">
-      <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-        <Shield size={20} className="text-[#25D366]" /> API Vault
-      </h2>
-      <p className="text-[#8696a0] text-xs mb-6">Securely manage your global API integration keys</p>
+      <div className="flex justify-between items-start mb-6">
+        <div>
+          <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+            <Shield size={20} className="text-[#25D366]" /> API Vault
+          </h2>
+          <p className="text-[#8696a0] text-xs">Securely manage your global API integration keys</p>
+        </div>
+        <button 
+          onClick={syncWebhook}
+          type="button"
+          className="bg-[#222d34] hover:bg-[#2a3942] text-white px-4 py-2 rounded-xl border border-[#222d34] flex items-center gap-2 text-xs font-bold transition-all"
+        >
+          <RefreshCw size={14} /> Sync Webhook
+        </button>
+      </div>
 
       <form onSubmit={handleSave} className="space-y-5">
         

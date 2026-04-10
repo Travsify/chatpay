@@ -56,6 +56,18 @@ export class AdminController {
         }
     }
 
+    }
+
+    static async syncWhapiWebhook(req: AuthRequest, res: Response) {
+        try {
+            const webhookUrl = 'https://chatpay-l4ej.onrender.com/webhook/whatsapp';
+            const result = await whapiService.registerWebhook(webhookUrl);
+            res.json({ message: 'Webhook synchronized with Whapi.cloud', result });
+        } catch (error: any) {
+            console.error('Webhook Sync Error:', error.response?.data || error.message);
+            res.status(500).json({ error: error.response?.data?.message || 'Failed to sync webhook' });
+        }
+    }
 
     // ===== DASHBOARD METRICS =====
     // GET /api/admin/metrics

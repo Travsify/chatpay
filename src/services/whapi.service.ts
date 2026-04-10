@@ -64,6 +64,33 @@ export class WhapiService {
             throw error;
         }
     }
+
+    async registerWebhook(webhookUrl: string) {
+        const token = await this.getToken();
+        try {
+            const response = await axios.patch(`${this.apiUrl}/settings`, {
+                webhooks: [
+                    {
+                        url: webhookUrl,
+                        events: [
+                            { type: "messages", method: "post" },
+                            { type: "statuses", method: "post" }
+                        ],
+                        mode: "full"
+                    }
+                ]
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Error registering Whapi webhook:', error.response?.data || error.message);
+            throw error;
+        }
+    }
 }
 
 export const whapiService = new WhapiService();
