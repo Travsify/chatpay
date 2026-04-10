@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import GodMode from './GodMode';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Wallet, ShieldCheck, FileText, Send, User, Copy, Check, TrendingUp, CreditCard, ChevronRight, ChevronDown, Briefcase, Users, Smartphone, Star } from 'lucide-react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
@@ -879,7 +880,7 @@ function App() {
             </>
           } />
           <Route path="/pay/:id" element={<Checkout />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin" element={<GodMode />} />
         </Routes>
       </AnimatePresence>
     </div>

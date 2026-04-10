@@ -22,4 +22,4 @@ services:
     publishPath: ./frontend/dist
     envVars:
       - key: VITE_API_URL
-        value: https://chatpay-backend.onrender.com
+        value: https://chatpay-l4ej.onrender.com
