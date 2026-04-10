@@ -109,10 +109,12 @@ model SystemConfig {
   premblyAppId    String?
   premblySecret   String?
   openaiKey       String?
-  fincraSecret    String?
+  fincraSecret      String?
   flutterwaveSecret String?
-  whapiToken      String?
-  updatedAt       DateTime @updatedAt
+  whapiToken        String?
+  quidaxSecret      String?
+  prestmitSecret    String?
+  updatedAt         DateTime @updatedAt
 }
 
 // ===== BUSINESS KYB (PREMBLY) =====

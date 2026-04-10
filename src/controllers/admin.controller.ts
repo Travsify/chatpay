@@ -40,6 +40,8 @@ export class AdminController {
             if (data.fincraSecret !== undefined) updateData.fincraSecret = data.fincraSecret;
             if (data.flutterwaveSecret !== undefined) updateData.flutterwaveSecret = data.flutterwaveSecret;
             if (data.whapiToken !== undefined) updateData.whapiToken = data.whapiToken;
+            if (data.quidaxSecret !== undefined) updateData.quidaxSecret = data.quidaxSecret;
+            if (data.prestmitSecret !== undefined) updateData.prestmitSecret = data.prestmitSecret;
 
             const config = await prisma.systemConfig.upsert({
                 where: { id: 'global' },
