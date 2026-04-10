@@ -344,8 +344,8 @@ const Home = () => {
 
         {/* HERO SECTION */}
         <section className="relative pt-32 pb-16 md:pt-40 md:pb-20 px-4 md:px-6 max-w-7xl mx-auto text-center min-h-[90vh] flex flex-col justify-center">
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[800px] h-[300px] md:h-[800px] bg-primary/10 rounded-full blur-[80px] md:blur-[120px] opacity-60 pointer-events-none" />
-           <div className="absolute top-1/4 left-1/4 w-[200px] md:w-[400px] h-[200px] md:h-[400px] bg-secondary/10 rounded-full blur-[60px] md:blur-[100px] opacity-50 pointer-events-none" />
+           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[800px] h-[300px] md:h-[800px] bg-[#25D366]/10 rounded-full blur-[80px] md:blur-[120px] opacity-60 pointer-events-none" />
+           <div className="absolute top-1/4 left-1/4 w-[200px] md:w-[400px] h-[200px] md:h-[400px] bg-[#128C7E]/10 rounded-full blur-[60px] md:blur-[100px] opacity-50 pointer-events-none" />
            
            <motion.div 
              initial={{ opacity: 0, y: 30 }}
@@ -354,20 +354,20 @@ const Home = () => {
              className="relative z-10"
            >
              <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-surface border border-border mb-6 md:mb-8 backdrop-blur-md shadow-[0_0_20px_rgba(37,211,102,0.1)]">
-                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-success animate-pulse" />
-                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-text-muted">ChatPay Engine 2.0 Live</span>
+                <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#25D366] animate-pulse" />
+                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#8696a0]">ChatPay Engine 2.0 Live</span>
              </div>
              
              <h1 className="text-[2.75rem] leading-[1.1] sm:text-6xl md:text-7xl lg:text-8xl font-black mb-6 md:mb-8 tracking-tighter text-white">
-               Banking, <br/> But Make It <span className="text-transparent bg-clip-text bg-gradient-to-r from-success to-accent">WhatsApp.</span>
+               Bank inside your <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#25D366] to-[#00A884]">WhatsApp.</span>
              </h1>
              
-             <p className="text-base md:text-lg lg:text-xl text-text-muted max-w-[90%] md:max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed font-medium">
-               No downloads. No passwords. Just say "Send 5k to Mom" on WhatsApp and watch the magic happen. The most invisible, yet powerful banking app ever built.
+             <p className="text-base md:text-lg lg:text-xl text-[#8696a0] max-w-[90%] md:max-w-2xl mx-auto mb-8 md:mb-10 leading-relaxed font-medium">
+               Transform your WhatsApp into a powerful banking hub. Send money, pay bills, trade crypto, and manage finances seamlessly with Virtual Accounts, Transfers & More.
              </p>
              
              <div className="flex flex-col sm:flex-row items-stretch justify-center gap-4 px-4 sm:px-0">
-               <a href="https://wa.me/2348000000000?text=Hi, let's start" target="_blank" rel="noopener noreferrer" className="px-6 py-4 md:px-8 md:py-4 bg-primary text-[#0b141a] rounded-2xl font-black text-base md:text-lg shadow-[0_0_30px_rgba(37,211,102,0.3)] hover:scale-105 transition-all flex items-center justify-center gap-2">
+               <a href="https://wa.me/2348000000000?text=Hi ChatPay" target="_blank" rel="noopener noreferrer" className="px-6 py-4 md:px-8 md:py-4 bg-[#25D366] text-[#0b141a] rounded-2xl font-black text-base md:text-lg shadow-[0_0_30px_rgba(37,211,102,0.3)] hover:scale-105 transition-all flex items-center justify-center gap-2">
                  <Send size={20} /> Text to Bank
                </a>
                <Link to="/dashboard" className="px-6 py-4 md:px-8 md:py-4 bg-surface border border-border text-white rounded-2xl font-bold text-base md:text-lg hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
@@ -376,40 +376,30 @@ const Home = () => {
              </div>
 
              <div className="mt-12 md:mt-16 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
-               <p className="text-xs md:text-sm font-bold tracking-widest uppercase text-text-muted">Tested & Powered By</p>
+               <p className="text-xs md:text-sm font-bold tracking-widest uppercase text-[#8696a0]">Banking rails powered By</p>
                <div className="flex gap-4 md:gap-6 items-center">
-                 <span className="text-lg md:text-xl font-black font-sans tracking-tight">OpenAI</span>
-                 <span className="text-lg md:text-xl font-black font-sans tracking-tight">Fincra</span>
-                 <span className="text-lg md:text-xl font-black font-sans tracking-tight">Flutterwave</span>
+                 <span className="text-lg md:text-xl font-black font-sans tracking-tight text-[#8696a0]">Fincra</span>
+                 <span className="text-lg md:text-xl font-black font-sans tracking-tight text-[#8696a0]">Flutterwave</span>
                </div>
              </div>
            </motion.div>
         </section>
 
-        {/* VALUE PROP / FEATURES SECTION */}
-        <section id="features" className="py-20 md:py-24 px-4 md:px-6 bg-surface/50 border-y border-border">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-12 md:mb-20 px-2">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight">Why We Are Different.</h2>
-              <p className="text-sm md:text-base text-text-muted max-w-2xl mx-auto leading-relaxed">We ripped out everything you hate about banking apps and rebuilt the core mechanics natively on top of the world's most ubiquitous messaging network.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-              {[
-                { icon: Wallet, title: "Zero App Footprint", desc: "No App Store, no updates, no taking up storage. Your entire bank lives inside a WhatsApp contact." },
-                { icon: ShieldCheck, title: "Bank-Grade KYC", desc: "Enterprise-level identity verification happens seamlessly within the chat interface using AI-driven logic." },
-                { icon: FileText, title: "Instant Invoicing", desc: "Generate payment links and professional invoices for your clients just by typing 'invoice 50k for logo'." },
-              ].map((f, i) => (
-                <div key={i} className="bg-surface p-8 rounded-[2rem] border border-border hover:-translate-y-2 hover:border-primary/50 transition-all duration-300 group shadow-lg">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 group-hover:bg-primary/20 transition-all">
-                    <f.icon className="text-primary" size={28} />
-                  </div>
-                  <h3 className="text-xl font-bold mb-3 tracking-tight">{f.title}</h3>
-                  <p className="text-sm text-text-muted leading-relaxed">{f.desc}</p>
+        {/* METRICS SECTION */}
+        <section className="py-12 border-y border-border bg-[#0b141a]">
+           <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 px-6 text-center">
+             {[
+               { value: "50k+", label: "Active Users" },
+               { value: "₦2B+", label: "Transaction Volume" },
+               { value: "99.9%", label: "Uptime" },
+               { value: "<30s", label: "Average Response" }
+             ].map((stat, i) => (
+                <div key={i}>
+                   <h3 className="text-3xl md:text-4xl font-black text-[#25D366] mb-2">{stat.value}</h3>
+                   <p className="text-[#8696a0] text-sm md:text-base font-medium">{stat.label}</p>
                 </div>
-              ))}
-            </div>
-          </div>
+             ))}
+           </div>
         </section>
 
         {/* HOW IT WORKS */}
@@ -417,21 +407,21 @@ const Home = () => {
           <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
             <div className="flex-1 space-y-8 md:space-y-10 order-2 lg:order-1">
               <div>
-                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight">Conversational Finance.</h2>
-                <p className="text-sm md:text-base text-text-muted leading-relaxed">Literally just talk to it like a human assistant. The GPT-4o engine parses your intent, extracts amounts, and executes secure ledger transactions.</p>
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Banking in 3 simple steps.</h2>
+                <p className="text-sm md:text-base text-[#8696a0] leading-relaxed">From first message to full financial control - get started in under 5 minutes without downloading a single app.</p>
               </div>
               
               <div className="space-y-8">
                 {[
-                  { step: "01", title: "Say Hello", text: "Save our number and send a message. The AI responds instantly." },
-                  { step: "02", title: "Intent Parsing", text: "Ask it to pay a bill, send money, or check balance. It understands natural language." },
-                  { step: "03", title: "Confirmation", text: "Review the exact details and confirm. Settled in milliseconds via real banking rails." },
+                  { step: "01", title: "Message ChatPay", text: "Send 'Hi ChatPay' to our WhatsApp number. No downloads, no signups required." },
+                  { step: "02", title: "Get Your Wallet", text: "Receive virtual accounts instantly. Trade NGN & USD directly from your chat." },
+                  { step: "03", title: "Start Transacting", text: "Send money, pay bills, and manage your finances with simple conversational commands." },
                 ].map((s, i) => (
                   <div key={i} className="flex gap-4 md:gap-6 group">
-                    <div className="font-mono text-primary font-black text-xl md:text-2xl mt-1 opacity-50 group-hover:opacity-100 transition-opacity">{s.step}</div>
+                    <div className="font-mono text-[#25D366] font-black text-xl md:text-2xl mt-1 opacity-50 group-hover:opacity-100 transition-opacity">{s.step}</div>
                     <div>
-                      <h4 className="font-bold text-lg md:text-xl mb-1">{s.title}</h4>
-                      <p className="text-sm text-text-muted leading-relaxed">{s.text}</p>
+                      <h4 className="font-bold text-lg md:text-xl mb-1 text-white">{s.title}</h4>
+                      <p className="text-sm text-[#8696a0] leading-relaxed">{s.text}</p>
                     </div>
                   </div>
                 ))}
@@ -440,32 +430,40 @@ const Home = () => {
             
             {/* WHATSAPP UI MOCKUP */}
             <div className="flex-1 w-full order-1 lg:order-2">
-              <div className="w-full max-w-[320px] sm:max-w-sm mx-auto bg-[#0b141a] border border-[#222d34] rounded-[2.5rem] p-3 md:p-4 pb-8 relative shadow-[0_0_50px_rgba(37,211,102,0.15)] ring-8 ring-surface overflow-hidden">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 md:w-40 h-6 bg-surface rounded-b-3xl mb-4 z-10" />
+              <div className="w-full max-w-[320px] sm:max-w-sm mx-auto bg-[#0b141a] border border-[#222d34] rounded-[2.5rem] p-3 md:p-4 pb-8 relative shadow-[0_0_50px_rgba(37,211,102,0.15)] ring-8 ring-[#111b21] overflow-hidden">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 md:w-40 h-6 bg-[#111b21] rounded-b-3xl mb-4 z-10" />
                 {/* Status Bar */}
                 <div className="bg-[#111b21] h-14 -mx-4 -mt-4 mb-2 flex items-center px-4 gap-3 border-b border-[#222d34]">
-                   <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center p-1"><img src="/logo.png" className="w-6 h-6 object-contain filter brightness-0 invert" /></div>
+                   <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center p-1"><img src="/logo.png" className="w-6 h-6 object-contain filter brightness-0 invert" alt="logo"/></div>
                    <div>
-                     <p className="text-white text-sm font-bold">ChatPay Engine</p>
-                     <p className="text-primary text-[10px] font-medium">online</p>
+                     <p className="text-white text-sm font-bold flex items-center gap-1">ChatPay <span className="w-1.5 h-1.5 rounded-full bg-[#25D366]"></span></p>
+                     <p className="text-[#25D366] text-[10px] font-medium">Online</p>
                    </div>
                 </div>
-                <div className="mt-4 space-y-4 px-1 pb-4">
-                   <div className="bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-4/5 ml-auto text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     Send 15,000 to John for dinner
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:42 AM ✓✓</p>
+                <div className="mt-6 space-y-4 px-1 pb-4">
+                   <div className="bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-fit ml-auto text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
+                     Hi ChatPay! 👋
+                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:30 AM ✓✓</p>
                    </div>
                    <div className="bg-[#202c33] text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     Got it. You want to send <b>₦15,000</b> to <b>John</b>.<br/><br/>Reply "YES" to confirm transfer.
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:42 AM</p>
+                     Welcome to ChatPay! 🎉 I'm your personal banking assistant. What would you like to do today?
+                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:30 AM</p>
                    </div>
                    <div className="bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-fit ml-auto text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     YES
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:43 AM ✓✓</p>
+                     💰 Send Money
+                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:31 AM ✓✓</p>
                    </div>
-                   <div className="bg-[#202c33] border-l-2 border-success text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     ✅ <b>Transfer successful!</b><br/><span className="text-text-muted">Ref: CHATPAY-9938</span>
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:43 AM</p>
+                   <div className="bg-[#202c33] text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
+                     Perfect! Who would you like to send money to?
+                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:31 AM</p>
+                   </div>
+                   <div className="bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-4/5 ml-auto text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
+                     Send ₦5000 to John - 0123456789 GTB Bank
+                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:31 AM ✓✓</p>
+                   </div>
+                   <div className="bg-[#202c33] border-l-2 border-[#25D366] text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
+                     ✅ Transfer successful! 💰<br/><br/>₦5,000 sent to John Doe<br/>🏦 GTBank (0123456789)<br/>⏰ Completed in 2.3 seconds
+                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:32 AM</p>
                    </div>
                 </div>
               </div>
@@ -473,11 +471,38 @@ const Home = () => {
           </div>
         </section>
 
+        {/* COMPLIANCE & FEATURES */}
+        <section id="features" className="py-20 md:py-24 px-4 md:px-6 bg-[#111b21] border-y border-[#222d34]">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-12 md:mb-20 px-2">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Trust & Security.</h2>
+              <p className="text-sm md:text-base text-[#8696a0] max-w-2xl mx-auto leading-relaxed">Built with enterprise-grade security architecture, guaranteeing your funds and data are isolated and protected unconditionally.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
+              {[
+                { icon: ShieldCheck, title: "NDIC Insured", desc: "Your funds are guaranteed and protected unconditionally." },
+                { icon: ShieldCheck, title: "AML Compliant", desc: "Bank-grade Anti-money laundering protocols integrated natively." },
+                { icon: ShieldCheck, title: "GDPR Ready", desc: "Data protection compliant across all international boundaries." },
+                { icon: ShieldCheck, title: "E2E Encrypted", desc: "Leveraging WhatsApp's AES-256 end-to-end messaging encryption." },
+              ].map((f, i) => (
+                <div key={i} className="bg-[#0b141a] p-8 rounded-[2rem] border border-[#222d34] hover:-translate-y-2 hover:border-[#25D366]/50 transition-all duration-300 shadow-lg text-center flex flex-col items-center">
+                  <div className="w-16 h-16 rounded-3xl bg-[#128C7E]/20 flex items-center justify-center mb-6">
+                    <f.icon className="text-[#25D366]" size={30} />
+                  </div>
+                  <h3 className="text-lg font-bold mb-3 tracking-tight text-white">{f.title}</h3>
+                  <p className="text-sm text-[#8696a0] leading-relaxed">{f.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* TESTIMONIALS */}
-        <section id="testimonials" className="py-20 md:py-24 px-4 md:px-6 bg-surface/30 border-y border-border overflow-hidden">
+        <section id="testimonials" className="py-20 md:py-24 px-4 md:px-6 bg-[#0b141a] overflow-hidden">
           <div className="max-w-7xl mx-auto text-center mb-12 md:mb-16 px-2">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight">Loved by Nigerians.</h2>
-            <p className="text-sm md:text-base text-text-muted">Don't just take our word for it.</p>
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Loved by Nigerians.</h2>
+            <p className="text-sm md:text-base text-[#8696a0]">Don't just take our word for it.</p>
           </div>
           <div className="flex gap-4 md:gap-6 overflow-x-auto pb-8 snap-x snap-mandatory px-4 md:px-6 hide-scrollbar">
              {[
@@ -485,41 +510,41 @@ const Home = () => {
                { name: "Sarah M.", handle: "@sarah_designs", text: "The invoicing feature is insane. I just type 'invoice client 50k' and it generates a beautiful checkout link. Got paid in 2 minutes." },
                { name: "Chinedu A.", handle: "@chinedu_tech", text: "The fact that this doesn't exist as an app on my phone is the best part. Ultimate stealth banking. Beautiful architecture." },
              ].map((t, i) => (
-               <div key={i} className="bg-surface border border-border min-w-[85vw] sm:min-w-[340px] md:min-w-[400px] p-6 md:p-8 rounded-[2rem] snap-center flex-shrink-0 hover:border-primary/30 transition-colors">
+               <div key={i} className="bg-[#111b21] border border-[#222d34] min-w-[85vw] sm:min-w-[340px] md:min-w-[400px] p-6 md:p-8 rounded-[2rem] snap-center flex-shrink-0 hover:border-[#25D366]/30 transition-colors">
                  <div className="flex items-center gap-4 mb-6">
                    <div className="w-12 h-12 bg-gradient-to-br from-[#128C7E] to-[#075E54] rounded-full shadow-inner" />
                    <div className="text-left">
                      <p className="font-bold text-sm md:text-base text-white">{t.name}</p>
-                     <p className="text-xs md:text-sm text-primary">{t.handle}</p>
+                     <p className="text-xs md:text-sm text-[#25D366]">{t.handle}</p>
                    </div>
                  </div>
-                 <p className="text-sm md:text-base leading-relaxed text-text-muted text-left">"{t.text}"</p>
+                 <p className="text-sm md:text-base leading-relaxed text-[#8696a0] text-left">"{t.text}"</p>
                </div>
              ))}
           </div>
         </section>
 
         {/* BOTTOM CTA */}
-        <section className="py-24 md:py-32 px-4 md:px-6">
-          <div className="max-w-5xl mx-auto bg-surface border border-border rounded-[3rem] p-8 md:p-20 text-center relative overflow-hidden shadow-[0_0_40px_rgba(37,211,102,0.1)]">
+        <section className="py-24 md:py-32 px-4 md:px-6 bg-[#0b141a]">
+          <div className="max-w-5xl mx-auto bg-[#111b21] border border-[#222d34] rounded-[3rem] p-8 md:p-20 text-center relative overflow-hidden shadow-[0_0_40px_rgba(37,211,102,0.1)]">
             <div className="absolute inset-0 bg-gradient-to-t from-[#128C7E]/20 to-transparent pointer-events-none" />
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-black mb-6 relative z-10 tracking-tight text-white">Stop downloading apps.</h2>
-            <p className="text-base md:text-lg text-text-muted mb-10 relative z-10 max-w-xl mx-auto">Join the revolution. Turn your WhatsApp into a high-powered financial terminal today.</p>
-            <a href="https://wa.me/2348000000000?text=Hi" target="_blank" rel="noopener noreferrer" className="bg-primary hover:bg-[#128C7E] text-[#0b141a] hover:text-white hover:scale-105 inline-flex py-4 px-8 md:py-5 md:px-10 rounded-2xl font-black text-base md:text-lg relative z-10 transition-all shadow-[0_0_20px_rgba(37,211,102,0.4)]">
+            <p className="text-base md:text-lg text-[#8696a0] mb-10 relative z-10 max-w-xl mx-auto">Join the revolution. Turn your WhatsApp into a high-powered financial terminal today.</p>
+            <a href="https://wa.me/2348000000000?text=Hi ChatPay" target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] hover:text-white hover:scale-105 inline-flex py-4 px-8 md:py-5 md:px-10 rounded-2xl font-black text-base md:text-lg relative z-10 transition-all shadow-[0_0_20px_rgba(37,211,102,0.4)]">
               Start Chatting Now
             </a>
           </div>
         </section>
 
         {/* FOOTER */}
-        <footer className="border-t border-border bg-background pt-16 md:pt-20 pb-8 px-4 md:px-6">
+        <footer className="border-t border-[#222d34] bg-[#0b141a] pt-16 md:pt-20 pb-8 px-4 md:px-6">
           <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 md:gap-12 mb-16">
             <div className="col-span-1 sm:col-span-2">
               <div className="flex items-center gap-3 mb-4">
                 <img src="/logo.png" className="w-8 h-8 object-contain" alt="ChatPay" />
                 <span className="font-bold text-xl text-white">ChatPay</span>
               </div>
-              <p className="text-text-muted text-sm max-w-xs leading-relaxed">The autonomous financial engine running purely on API architecture and WhatsApp infrastructure.</p>
+              <p className="text-[#8696a0] text-sm max-w-xs leading-relaxed">The autonomous financial engine running purely on API architecture and WhatsApp infrastructure.</p>
             </div>
             <div>
               <h4 className="font-bold mb-4">Product</h4>
