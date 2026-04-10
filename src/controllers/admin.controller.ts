@@ -68,6 +68,18 @@ export class AdminController {
         }
     }
 
+    static async testOutbound(req: AuthRequest, res: Response) {
+        try {
+            const { phoneNumber } = req.body;
+            if (!phoneNumber) throw new Error('Phone number is required');
+            const result = await whapiService.sendMessage(phoneNumber, "🚀 *ChatPay Connection Test*: Your WhatsApp bot is now successfully connected to the God Mode engine!");
+            res.json({ message: 'Test message sent!', result });
+        } catch (error: any) {
+            console.error('Test Outbound Error:', error.response?.data || error.message);
+            res.status(500).json({ error: error.response?.data?.message || 'Failed to send test message' });
+        }
+    }
+
     // ===== DASHBOARD METRICS =====
     // GET /api/admin/metrics
     static async getMetrics(req: AuthRequest, res: Response) {

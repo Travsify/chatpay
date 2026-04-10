@@ -58,6 +58,7 @@ app.get('/api/admin/health', authMiddleware, AdminController.getSystemHealth);
 app.get('/api/admin/config', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.getSystemConfig);
 app.post('/api/admin/config', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.updateSystemConfig);
 app.post('/api/admin/config/sync-webhook', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.syncWhapiWebhook);
+app.post('/api/admin/config/test-outbound', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.testOutbound);
 
 // Transactions
 app.get('/api/admin/transactions', authMiddleware, AdminController.getTransactions);

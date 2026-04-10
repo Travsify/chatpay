@@ -1109,6 +1109,17 @@ const ApiVault = ({ api }: { api: any }) => {
     }
   };
 
+  const sendTestMessage = async () => {
+    const phone = prompt("Enter your personal phone number (e.g. 23480...) to receive a test message:");
+    if (!phone) return;
+    try {
+      await api('/api/admin/config/test-outbound', { method: 'POST', data: { phoneNumber: phone } });
+      alert('Test message sent! Check your WhatsApp.');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to send test message');
+    }
+  };
+
   if (loading) return <div className="text-[#8696a0] text-sm py-4">Loading Vault...</div>;
 
   return (
@@ -1120,13 +1131,22 @@ const ApiVault = ({ api }: { api: any }) => {
           </h2>
           <p className="text-[#8696a0] text-xs">Securely manage your global API integration keys</p>
         </div>
-        <button 
-          onClick={syncWebhook}
-          type="button"
-          className="bg-[#222d34] hover:bg-[#2a3942] text-white px-4 py-2 rounded-xl border border-[#222d34] flex items-center gap-2 text-xs font-bold transition-all"
-        >
-          <RefreshCw size={14} /> Sync Webhook
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={sendTestMessage}
+            type="button"
+            className="bg-[#111b21] hover:bg-[#222d34] text-[#25D366] px-4 py-2 rounded-xl border border-[#25D366]/30 flex items-center gap-2 text-xs font-bold transition-all"
+          >
+            <Zap size={14} /> Test Outbound
+          </button>
+          <button 
+            onClick={syncWebhook}
+            type="button"
+            className="bg-[#222d34] hover:bg-[#2a3942] text-white px-4 py-2 rounded-xl border border-[#222d34] flex items-center gap-2 text-xs font-bold transition-all"
+          >
+            <RefreshCw size={14} /> Sync Webhook
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="space-y-5">
