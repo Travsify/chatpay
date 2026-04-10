@@ -43,6 +43,65 @@ const FadeInSection = ({ children, delay = 0, className = '' }: { children: Reac
   );
 };
 
+// 3D Mouse-reactive tilt
+const useMouse3D = (intensity = 15) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [transform, setTransform] = useState('rotateX(0deg) rotateY(0deg)');
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const handleMove = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / rect.width - 0.5;
+      const y = (e.clientY - rect.top) / rect.height - 0.5;
+      setTransform(`rotateY(${x * intensity}deg) rotateX(${-y * intensity}deg)`);
+    };
+    const handleLeave = () => setTransform('rotateY(0deg) rotateX(0deg)');
+    el.addEventListener('mousemove', handleMove);
+    el.addEventListener('mouseleave', handleLeave);
+    return () => { el.removeEventListener('mousemove', handleMove); el.removeEventListener('mouseleave', handleLeave); };
+  }, [intensity]);
+
+  return { ref, transform };
+};
+
+// Floating particles background
+const ParticleField = ({ count = 20 }: { count?: number }) => (
+  <div className="particles">
+    {[...Array(count)].map((_, i) => (
+      <div
+        key={i}
+        className="particle"
+        style={{
+          left: `${Math.random() * 100}%`,
+          bottom: `-${Math.random() * 20}%`,
+          width: `${2 + Math.random() * 4}px`,
+          height: `${2 + Math.random() * 4}px`,
+          animationDuration: `${8 + Math.random() * 12}s`,
+          animationDelay: `${Math.random() * 10}s`,
+          opacity: 0.15 + Math.random() * 0.3,
+        }}
+      />
+    ))}
+  </div>
+);
+
+// 3D tilt card
+const Tilt3DCard = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => {
+  const tilt = useMouse3D(8);
+  return (
+    <div ref={tilt.ref} className={`perspective-1000 ${className}`}>
+      <div
+        className="preserve-3d transition-transform duration-300 ease-out"
+        style={{ transform: tilt.transform }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
 const TypingIndicator = () => (
   <div className="bg-[#202c33] rounded-2xl rounded-tl-sm p-3 w-20 text-[13px] flex gap-1.5 items-center">
     <span className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -476,8 +535,10 @@ const Home = () => {
 
         {/* HERO SECTION */}
         <section className="relative pt-32 pb-16 md:pt-40 md:pb-20 px-4 md:px-6 max-w-7xl mx-auto text-center min-h-[90vh] flex flex-col justify-center">
-           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] md:w-[800px] h-[300px] md:h-[800px] bg-[#25D366]/10 rounded-full blur-[80px] md:blur-[120px] opacity-60 pointer-events-none" />
-           <div className="absolute top-1/4 left-1/4 w-[200px] md:w-[400px] h-[200px] md:h-[400px] bg-[#128C7E]/10 rounded-full blur-[60px] md:blur-[100px] opacity-50 pointer-events-none" />
+           <ParticleField count={25} />
+           <div className="gradient-orb w-[300px] md:w-[800px] h-[300px] md:h-[800px] bg-[#25D366]/15 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-float-slow" />
+           <div className="gradient-orb w-[200px] md:w-[400px] h-[200px] md:h-[400px] bg-[#128C7E]/15 top-1/4 left-1/4 animate-float-reverse" />
+           <div className="gradient-orb w-[150px] md:w-[300px] h-[150px] md:h-[300px] bg-[#00A884]/10 bottom-1/4 right-1/4 animate-float" />
            
            <motion.div 
              initial={{ opacity: 0, y: 30 }}
@@ -485,9 +546,9 @@ const Home = () => {
              transition={{ duration: 0.8, ease: "easeOut" }}
              className="relative z-10"
            >
-             <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-surface border border-border mb-6 md:mb-8 backdrop-blur-md shadow-[0_0_20px_rgba(37,211,102,0.1)]">
+             <div className="inline-flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-surface border border-border mb-6 md:mb-8 backdrop-blur-md shadow-[0_0_20px_rgba(37,211,102,0.1)] animate-shimmer">
                 <span className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#25D366] animate-pulse" />
-                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#8696a0]">ChatPay Engine 2.0 Live</span>
+                <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-[#8696a0]">ChatPay v3.0 — Now with 3D</span>
              </div>
              
              <h1 className="text-[2.75rem] leading-[1.1] sm:text-6xl md:text-7xl lg:text-8xl font-black mb-6 md:mb-8 tracking-tighter text-white">
@@ -571,10 +632,14 @@ const Home = () => {
               </div>
             </div>
             
-            {/* ANIMATED WHATSAPP UI MOCKUP */}
+            {/* 3D ANIMATED WHATSAPP UI MOCKUP */}
             <div className="flex-1 w-full order-1 lg:order-2">
               <FadeInSection delay={0.3}>
-              <LiveChatMockup />
+              <Tilt3DCard>
+                <div className="animate-float">
+                  <LiveChatMockup />
+                </div>
+              </Tilt3DCard>
               </FadeInSection>
             </div>
           </div>
