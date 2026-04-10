@@ -11,14 +11,22 @@ export class WhapiService {
     }
 
     private async getToken() {
-        if (this.token && this.token !== '' && this.token !== 'your_whapi_token_here') return this.token;
-        
+        // PRIORITY 1: Check Database (God Mode Vault)
         try {
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-            return config?.whapiToken || this.token;
+            if (config?.whapiToken && config.whapiToken !== '') {
+                return config.whapiToken;
+            }
         } catch (e) {
+            console.error('[Whapi] Failed to fetch token from DB, falling back to ENV');
+        }
+
+        // PRIORITY 2: Fallback to Environment Variable
+        if (this.token && this.token !== '' && this.token !== 'your_whapi_token_here') {
             return this.token;
         }
+
+        return '';
     }
 
     async sendMessage(to: string, body: string) {

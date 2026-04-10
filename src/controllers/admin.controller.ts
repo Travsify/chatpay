@@ -72,10 +72,33 @@ export class AdminController {
         try {
             const { phoneNumber } = req.body;
             if (!phoneNumber) throw new Error('Phone number is required');
+            
             const result = await whapiService.sendMessage(phoneNumber, "🚀 *ChatPay Connection Test*: Your WhatsApp bot is now successfully connected to the God Mode engine!");
+            
+            // Log to DB for visibility
+            await prisma.webhookLog.create({
+                data: {
+                    direction: 'OUTBOUND',
+                    status: 'SUCCESS',
+                    phoneNumber: phoneNumber,
+                    payload: JSON.stringify(result)
+                }
+            });
+
             res.json({ message: 'Test message sent!', result });
         } catch (error: any) {
             console.error('Test Outbound Error:', error.response?.data || error.message);
+            
+            await prisma.webhookLog.create({
+                data: {
+                    direction: 'OUTBOUND',
+                    status: 'ERROR',
+                    phoneNumber: req.body.phoneNumber || 'UNKNOWN',
+                    payload: JSON.stringify(error.response?.data || {}),
+                    errorMsg: error.message
+                }
+            });
+
             res.status(500).json({ error: error.response?.data?.message || 'Failed to send test message' });
         }
     }
