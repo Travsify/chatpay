@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import prisma from '../utils/prisma.js';
 import { AuthRequest } from '../middleware/auth.middleware.js';
 import { PremblyService } from '../services/prembly.service.js';
+import { WalletService } from '../services/wallet.service.js';
 
 export class AdminController {
 
@@ -436,6 +437,13 @@ export class AdminController {
                 where: { id: userId },
                 data: { kycStatus: 'VERIFIED', tier: 2 } // Tier 2 = KYB Verified
             });
+
+            // Trigger Fincra Business Account creation
+            try {
+                await WalletService.setupUserWallet(userId, 'business', data.company_name);
+            } catch (walletErr) {
+                console.error('Wallet Upgrade Error (Non-Fatal):', walletErr);
+            }
 
             res.json({ message: 'Business successfully vetted and saved', business: businessModel });
         } catch (error: any) {

@@ -3,19 +3,19 @@ import prisma from '../utils/prisma.js';
 
 export class WalletService {
     
-    static async setupUserWallet(userId: string) {
+    static async setupUserWallet(userId: string, type: 'individual' | 'business' = 'individual', businessName?: string) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user || user.fincraWalletId) return;
+        if (!user) return;
 
         try {
             // 1. Create Fincra Customer
             const names = (user.name || 'ChatPay User').split(' ');
             const customer = await fincraService.createCustomer({
-                firstName: names[0],
-                lastName: names[1] || 'User',
+                firstName: type === 'business' ? (businessName || names[0]) : names[0],
+                lastName: type === 'business' ? 'Enterprise' : (names[1] || 'User'),
                 email: `${user.phoneNumber}@chatpay.io`,
                 phoneNumber: user.phoneNumber,
-                type: 'individual'
+                type: type
             });
 
             // 2. Create Virtual Account
