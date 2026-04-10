@@ -38,6 +38,7 @@ export class AdminController {
             if (data.premblySecret !== undefined) updateData.premblySecret = data.premblySecret;
             if (data.openaiKey !== undefined) updateData.openaiKey = data.openaiKey;
             if (data.fincraSecret !== undefined) updateData.fincraSecret = data.fincraSecret;
+            if (data.flutterwaveSecret !== undefined) updateData.flutterwaveSecret = data.flutterwaveSecret;
             if (data.whapiToken !== undefined) updateData.whapiToken = data.whapiToken;
 
             const config = await prisma.systemConfig.upsert({

@@ -110,6 +110,7 @@ model SystemConfig {
   premblySecret   String?
   openaiKey       String?
   fincraSecret    String?
+  flutterwaveSecret String?
   whapiToken      String?
   updatedAt       DateTime @updatedAt
 }

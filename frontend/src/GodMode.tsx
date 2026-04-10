@@ -1058,6 +1058,7 @@ const ApiVault = ({ api }: { api: any }) => {
     premblySecret: '',
     openaiKey: '',
     fincraSecret: '',
+    flutterwaveSecret: '',
     whapiToken: ''
   });
   const [loading, setLoading] = useState(true);
@@ -1162,19 +1163,36 @@ const ApiVault = ({ api }: { api: any }) => {
           </div>
         </div>
 
-        {/* Fincra */}
-        <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
-          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
-            <Wallet size={14} className="text-amber-400" /> Fincra
-          </label>
-          <div className="relative">
-             <input
-               type={visibleKeys.fincraSecret ? "text" : "password"} name="fincraSecret" value={config.fincraSecret || ''} onChange={handleChange}
-               className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
-             />
-             <button type="button" onClick={() => toggleVisibility('fincraSecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
-                {visibleKeys.fincraSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-             </button>
+        {/* Fincra & Flutterwave */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+            <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+              <Wallet size={14} className="text-amber-400" /> Fincra
+            </label>
+            <div className="relative">
+              <input
+                type={visibleKeys.fincraSecret ? "text" : "password"} name="fincraSecret" value={config.fincraSecret || ''} onChange={handleChange}
+                className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
+              />
+              <button type="button" onClick={() => toggleVisibility('fincraSecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                  {visibleKeys.fincraSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+            <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+              <Wallet size={14} className="text-[#f5a623]" /> Flutterwave
+            </label>
+            <div className="relative">
+              <input
+                type={visibleKeys.flutterwaveSecret ? "text" : "password"} name="flutterwaveSecret" value={config.flutterwaveSecret || ''} onChange={handleChange}
+                className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
+              />
+              <button type="button" onClick={() => toggleVisibility('flutterwaveSecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                  {visibleKeys.flutterwaveSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </div>
         </div>
 
