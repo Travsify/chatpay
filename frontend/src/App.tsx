@@ -406,7 +406,7 @@ const Checkout = () => (
 
 
 const Home = () => {
-  const [waNumber, setWaNumber] = useState('2348000000000');
+  const [waNumber, setWaNumber] = useState('2348026990956');
   useEffect(() => {
     fetch('/api/config/public')
       .then(res => res.json())

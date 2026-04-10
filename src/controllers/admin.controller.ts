@@ -13,7 +13,7 @@ export class AdminController {
                 config = await prisma.systemConfig.create({
                     data: {
                         id: 'global',
-                        whatsappNumber: '',
+                        whatsappNumber: '2348026990956',
                         premblyAppId: '',
                         premblySecret: '',
                         openaiKey: '',
