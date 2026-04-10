@@ -1,9 +1,137 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Wallet, ShieldCheck, FileText, Send, User, Copy, Check, TrendingUp, CreditCard, ChevronRight, ChevronDown, Briefcase, Users, Smartphone } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Wallet, ShieldCheck, FileText, Send, User, Copy, Check, TrendingUp, CreditCard, ChevronRight, ChevronDown, Briefcase, Users, Smartphone, Star } from 'lucide-react';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
+
+// --- ANIMATION HELPERS ---
+
+const useCountUp = (end: number, duration = 2000, suffix = '') => {
+  const [count, setCount] = useState(0);
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-50px' });
+  
+  useEffect(() => {
+    if (!inView) return;
+    let start = 0;
+    const step = end / (duration / 16);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= end) { setCount(end); clearInterval(timer); }
+      else setCount(Math.floor(start));
+    }, 16);
+    return () => clearInterval(timer);
+  }, [inView, end, duration]);
+  
+  return { ref, count, suffix };
+};
+
+const FadeInSection = ({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) => {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.7, delay, ease: 'easeOut' }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
+const TypingIndicator = () => (
+  <div className="bg-[#202c33] rounded-2xl rounded-tl-sm p-3 w-20 text-[13px] flex gap-1.5 items-center">
+    <span className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+    <span className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+    <span className="w-2 h-2 bg-[#8696a0] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+  </div>
+);
+
+const chatMessages = [
+  { type: 'user', text: 'Hi ChatPay! 👋', time: '10:30 AM' },
+  { type: 'bot', text: "Welcome to ChatPay! 🎉 I'm your personal banking assistant. What would you like to do today?", time: '10:30 AM' },
+  { type: 'user', text: '💰 Send Money', time: '10:31 AM' },
+  { type: 'bot', text: 'Perfect! Who would you like to send money to?', time: '10:31 AM' },
+  { type: 'user', text: 'Send ₦5000 to John - 0123456789 GTB Bank', time: '10:31 AM' },
+  { type: 'bot', text: '✅ Transfer successful! 💰\n\n₦5,000 sent to John Doe\n🏦 GTBank (0123456789)\n⏰ Completed in 2.3 seconds', time: '10:32 AM', success: true },
+];
+
+const LiveChatMockup = () => {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: false, margin: '-100px' });
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!inView) { setVisibleCount(0); return; }
+    let idx = 0;
+    const showNext = () => {
+      if (idx >= chatMessages.length) {
+        setTimeout(() => { setVisibleCount(0); idx = 0; showNext(); }, 4000);
+        return;
+      }
+      const msg = chatMessages[idx];
+      if (msg.type === 'bot') {
+        setIsTyping(true);
+        setTimeout(() => {
+          setIsTyping(false);
+          idx++;
+          setVisibleCount(idx);
+          setTimeout(showNext, 800);
+        }, 1200);
+      } else {
+        idx++;
+        setVisibleCount(idx);
+        setTimeout(showNext, 600);
+      }
+    };
+    const t = setTimeout(showNext, 500);
+    return () => clearTimeout(t);
+  }, [inView]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [visibleCount, isTyping]);
+
+  return (
+    <div ref={ref} className="w-full max-w-[320px] sm:max-w-sm mx-auto bg-[#0b141a] border border-[#222d34] rounded-[2.5rem] p-3 md:p-4 pb-8 relative shadow-[0_0_50px_rgba(37,211,102,0.15)] ring-8 ring-[#111b21] overflow-hidden">
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 md:w-40 h-6 bg-[#111b21] rounded-b-3xl mb-4 z-10" />
+      <div className="bg-[#111b21] h-14 -mx-4 -mt-4 mb-2 flex items-center px-4 gap-3 border-b border-[#222d34]">
+        <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center p-1"><img src="/logo.png" className="w-6 h-6 object-contain filter brightness-0 invert" alt="logo"/></div>
+        <div>
+          <p className="text-white text-sm font-bold flex items-center gap-1">ChatPay <span className="w-1.5 h-1.5 rounded-full bg-[#25D366]"></span></p>
+          <p className="text-[#25D366] text-[10px] font-medium">{isTyping ? 'typing...' : 'Online'}</p>
+        </div>
+      </div>
+      <div className="mt-6 space-y-3 px-1 pb-4 min-h-[320px] max-h-[380px] overflow-y-auto hide-scrollbar">
+        <AnimatePresence>
+          {chatMessages.slice(0, visibleCount).map((msg, i) => (
+            <motion.div
+              key={`${visibleCount > chatMessages.length ? 'r' : ''}${i}`}
+              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className={msg.type === 'user'
+                ? 'bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-fit ml-auto text-[13px] shadow-sm max-w-[85%]'
+                : `bg-[#202c33] ${msg.success ? 'border-l-2 border-[#25D366]' : ''} text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm`
+              }
+            >
+              {msg.text.split('\n').map((line, j) => <span key={j}>{line}<br/></span>)}
+              <p className="text-[9px] text-[#8696a0] text-right mt-1">{msg.time} {msg.type === 'user' ? '✓✓' : ''}</p>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        {isTyping && <TypingIndicator />}
+        <div ref={chatEndRef} />
+      </div>
+    </div>
+  );
+};
 
 // --- STYLES & CONFIG ---
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
@@ -384,20 +512,31 @@ const Home = () => {
            </motion.div>
         </section>
 
-        {/* METRICS SECTION */}
-        <section className="py-12 border-y border-border bg-[#0b141a]">
-           <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 px-6 text-center">
+        {/* ANIMATED METRICS SECTION */}
+        <section className="py-16 border-y border-[#222d34] bg-[#0b141a] relative overflow-hidden">
+           <div className="absolute inset-0 bg-gradient-to-r from-[#25D366]/5 via-transparent to-[#128C7E]/5 pointer-events-none" />
+           <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 px-6 text-center relative z-10">
              {[
-               { value: "50k+", label: "Active Users" },
-               { value: "₦2B+", label: "Transaction Volume" },
-               { value: "99.9%", label: "Uptime" },
-               { value: "<30s", label: "Average Response" }
-             ].map((stat, i) => (
-                <div key={i}>
-                   <h3 className="text-3xl md:text-4xl font-black text-[#25D366] mb-2">{stat.value}</h3>
-                   <p className="text-[#8696a0] text-sm md:text-base font-medium">{stat.label}</p>
-                </div>
-             ))}
+               { end: 50, suffix: "k+", label: "Active Users", sub: "Banking daily on WhatsApp" },
+               { end: 2, suffix: "B+", prefix: "₦", label: "Transaction Volume", sub: "Processed securely" },
+               { end: 99.9, suffix: "%", label: "Uptime", sub: "Always available" },
+               { end: 30, suffix: "s", prefix: "<", label: "Average Response", sub: "Lightning fast support" }
+             ].map((stat, i) => {
+               const counter = useCountUp(stat.end, 2500);
+               return (
+                 <FadeInSection key={i} delay={i * 0.15}>
+                   <div className="p-6 rounded-2xl border border-[#222d34] bg-[#111b21]/50 hover:border-[#25D366]/30 transition-all hover:scale-105 duration-300">
+                     <div ref={counter.ref}>
+                       <h3 className="text-3xl md:text-5xl font-black text-[#25D366] mb-2 tabular-nums">
+                         {stat.prefix || ''}{stat.end === 99.9 ? counter.count.toFixed(1) : counter.count.toLocaleString()}{stat.suffix}
+                       </h3>
+                     </div>
+                     <p className="text-white text-sm md:text-base font-bold mb-1">{stat.label}</p>
+                     <p className="text-[#8696a0] text-xs">{stat.sub}</p>
+                   </div>
+                 </FadeInSection>
+               );
+             })}
            </div>
         </section>
 
@@ -427,45 +566,11 @@ const Home = () => {
               </div>
             </div>
             
-            {/* WHATSAPP UI MOCKUP */}
+            {/* ANIMATED WHATSAPP UI MOCKUP */}
             <div className="flex-1 w-full order-1 lg:order-2">
-              <div className="w-full max-w-[320px] sm:max-w-sm mx-auto bg-[#0b141a] border border-[#222d34] rounded-[2.5rem] p-3 md:p-4 pb-8 relative shadow-[0_0_50px_rgba(37,211,102,0.15)] ring-8 ring-[#111b21] overflow-hidden">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 md:w-40 h-6 bg-[#111b21] rounded-b-3xl mb-4 z-10" />
-                {/* Status Bar */}
-                <div className="bg-[#111b21] h-14 -mx-4 -mt-4 mb-2 flex items-center px-4 gap-3 border-b border-[#222d34]">
-                   <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center p-1"><img src="/logo.png" className="w-6 h-6 object-contain filter brightness-0 invert" alt="logo"/></div>
-                   <div>
-                     <p className="text-white text-sm font-bold flex items-center gap-1">ChatPay <span className="w-1.5 h-1.5 rounded-full bg-[#25D366]"></span></p>
-                     <p className="text-[#25D366] text-[10px] font-medium">Online</p>
-                   </div>
-                </div>
-                <div className="mt-6 space-y-4 px-1 pb-4">
-                   <div className="bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-fit ml-auto text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     Hi ChatPay! 👋
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:30 AM ✓✓</p>
-                   </div>
-                   <div className="bg-[#202c33] text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     Welcome to ChatPay! 🎉 I'm your personal banking assistant. What would you like to do today?
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:30 AM</p>
-                   </div>
-                   <div className="bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-fit ml-auto text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     💰 Send Money
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:31 AM ✓✓</p>
-                   </div>
-                   <div className="bg-[#202c33] text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     Perfect! Who would you like to send money to?
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:31 AM</p>
-                   </div>
-                   <div className="bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-4/5 ml-auto text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     Send ₦5000 to John - 0123456789 GTB Bank
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:31 AM ✓✓</p>
-                   </div>
-                   <div className="bg-[#202c33] border-l-2 border-[#25D366] text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm transform transition-all hover:scale-[1.02]">
-                     ✅ Transfer successful! 💰<br/><br/>₦5,000 sent to John Doe<br/>🏦 GTBank (0123456789)<br/>⏰ Completed in 2.3 seconds
-                     <p className="text-[9px] text-[#8696a0] text-right mt-1">10:32 AM</p>
-                   </div>
-                </div>
-              </div>
+              <FadeInSection delay={0.3}>
+              <LiveChatMockup />
+              </FadeInSection>
             </div>
           </div>
         </section>
@@ -473,10 +578,12 @@ const Home = () => {
         {/* COMPLIANCE & FEATURES */}
         <section id="features" className="py-20 md:py-24 px-4 md:px-6 bg-[#111b21] border-y border-[#222d34]">
           <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-12 md:mb-20 px-2">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Trust & Security.</h2>
-              <p className="text-sm md:text-base text-[#8696a0] max-w-2xl mx-auto leading-relaxed">Built with enterprise-grade security architecture, guaranteeing your funds and data are isolated and protected unconditionally.</p>
-            </div>
+            <FadeInSection>
+              <div className="text-center mb-12 md:mb-20 px-2">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Trust & Security.</h2>
+                <p className="text-sm md:text-base text-[#8696a0] max-w-2xl mx-auto leading-relaxed">Built with enterprise-grade security architecture, guaranteeing your funds and data are isolated and protected unconditionally.</p>
+              </div>
+            </FadeInSection>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
               {[
@@ -485,13 +592,15 @@ const Home = () => {
                 { icon: ShieldCheck, title: "GDPR Ready", desc: "Data protection compliant across all international boundaries." },
                 { icon: ShieldCheck, title: "E2E Encrypted", desc: "Leveraging WhatsApp's AES-256 end-to-end messaging encryption." },
               ].map((f, i) => (
-                <div key={i} className="bg-[#0b141a] p-8 rounded-[2rem] border border-[#222d34] hover:-translate-y-2 hover:border-[#25D366]/50 transition-all duration-300 shadow-lg text-center flex flex-col items-center">
-                  <div className="w-16 h-16 rounded-3xl bg-[#128C7E]/20 flex items-center justify-center mb-6">
-                    <f.icon className="text-[#25D366]" size={30} />
+                <FadeInSection key={i} delay={i * 0.1}>
+                  <div className="bg-[#0b141a] p-8 rounded-[2rem] border border-[#222d34] hover:-translate-y-2 hover:border-[#25D366]/50 transition-all duration-300 shadow-lg text-center flex flex-col items-center h-full">
+                    <div className="w-16 h-16 rounded-3xl bg-[#128C7E]/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      <f.icon className="text-[#25D366]" size={30} />
+                    </div>
+                    <h3 className="text-lg font-bold mb-3 tracking-tight text-white">{f.title}</h3>
+                    <p className="text-sm text-[#8696a0] leading-relaxed">{f.desc}</p>
                   </div>
-                  <h3 className="text-lg font-bold mb-3 tracking-tight text-white">{f.title}</h3>
-                  <p className="text-sm text-[#8696a0] leading-relaxed">{f.desc}</p>
-                </div>
+                </FadeInSection>
               ))}
             </div>
           </div>
@@ -500,49 +609,66 @@ const Home = () => {
         {/* USE CASES SECTION */}
         <section className="py-20 md:py-24 px-4 md:px-6 border-y border-[#222d34]">
           <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16 px-2">
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Who is ChatPay for?</h2>
-              <p className="text-sm md:text-base text-[#8696a0] max-w-2xl mx-auto leading-relaxed">Engineered for velocity. Built to scale across any financial requirement.</p>
-            </div>
+            <FadeInSection>
+              <div className="text-center mb-16 px-2">
+                <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Who is ChatPay for?</h2>
+                <p className="text-sm md:text-base text-[#8696a0] max-w-2xl mx-auto leading-relaxed">Engineered for velocity. Built to scale across any financial requirement.</p>
+              </div>
+            </FadeInSection>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
               {[
                 { icon: Briefcase, title: "Freelancers", desc: "Generate professional payment links mapped to your USD virtual account inside a WhatsApp chat.", color: "from-[#25D366] to-[#128C7E]" },
                 { icon: Users, title: "Small Businesses", desc: "Pay salaries, vendors, and manage invoicing without needing multiple banking portals or complex setups.", color: "from-[#00A884] to-[#075E54]" },
                 { icon: Smartphone, title: "Digital Natives", desc: "Split bills with friends, pay for subscriptions, and trade crypto effortlessly while texting.", color: "from-[#128C7E] to-[#005c4b]" }
               ].map((uc, i) => (
-                <div key={i} className="relative group p-8 bg-[#111b21] rounded-[2.5rem] border border-[#222d34] overflow-hidden hover:border-[#25D366]/40 transition-colors shadow-lg">
-                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${uc.color} opacity-10 rounded-bl-[100px] transition-transform group-hover:scale-110`} />
-                  <uc.icon className="text-[#25D366] mb-6" size={36} />
-                  <h3 className="text-xl font-bold mb-3 text-white">{uc.title}</h3>
-                  <p className="text-sm text-[#8696a0] leading-relaxed">{uc.desc}</p>
-                </div>
+                <FadeInSection key={i} delay={i * 0.15}>
+                  <div className="relative group p-8 bg-[#111b21] rounded-[2.5rem] border border-[#222d34] overflow-hidden hover:border-[#25D366]/40 transition-colors shadow-lg h-full">
+                    <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${uc.color} opacity-10 rounded-bl-[100px] transition-transform group-hover:scale-110`} />
+                    <uc.icon className="text-[#25D366] mb-6" size={36} />
+                    <h3 className="text-xl font-bold mb-3 text-white">{uc.title}</h3>
+                    <p className="text-sm text-[#8696a0] leading-relaxed">{uc.desc}</p>
+                  </div>
+                </FadeInSection>
               ))}
             </div>
           </div>
         </section>
 
-        {/* TESTIMONIALS */}
-        <section id="testimonials" className="py-20 md:py-24 px-4 md:px-6 bg-[#0b141a] overflow-hidden">
-          <div className="max-w-7xl mx-auto text-center mb-12 md:mb-16 px-2">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Loved by Nigerians.</h2>
-            <p className="text-sm md:text-base text-[#8696a0]">Don't just take our word for it.</p>
-          </div>
-          <div className="flex gap-4 md:gap-6 overflow-x-auto pb-8 snap-x snap-mandatory px-4 md:px-6 hide-scrollbar">
+        {/* TESTIMONIALS GRID */}
+        <section id="testimonials" className="py-20 md:py-24 px-4 md:px-6 bg-[#0b141a]">
+          <FadeInSection>
+            <div className="max-w-7xl mx-auto text-center mb-12 md:mb-16 px-2">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Loved by Nigerians.</h2>
+              <p className="text-sm md:text-base text-[#8696a0]">Don't just take our word for it. See what our users say.</p>
+            </div>
+          </FadeInSection>
+          <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
              {[
-               { name: "Oyekanmi E.", handle: "@oyecode", text: "ChatPay is literally sorcery. I paid my electricity bill while mid-conversation with my boss on WhatsApp. Didn't even switch apps." },
-               { name: "Sarah M.", handle: "@sarah_designs", text: "The invoicing feature is insane. I just type 'invoice client 50k' and it generates a beautiful checkout link. Got paid in 2 minutes." },
-               { name: "Chinedu A.", handle: "@chinedu_tech", text: "The fact that this doesn't exist as an app on my phone is the best part. Ultimate stealth banking. Beautiful architecture." },
+               { name: "Oyekanmi E.", handle: "@oyecode", text: "ChatPay is literally sorcery. I paid my electricity bill while mid-conversation with my boss on WhatsApp. Didn't even switch apps.", rating: 5, role: "Software Engineer" },
+               { name: "Sarah M.", handle: "@sarah_designs", text: "The invoicing feature is insane. I just type 'invoice client 50k' and it generates a beautiful checkout link. Got paid in 2 minutes.", rating: 5, role: "Freelance Designer" },
+               { name: "Chinedu A.", handle: "@chinedu_tech", text: "The fact that this doesn't exist as an app on my phone is the best part. Ultimate stealth banking. Beautiful architecture.", rating: 5, role: "Startup Founder" },
+               { name: "Amaka O.", handle: "@amaka_biz", text: "I run payroll for 12 staff entirely from WhatsApp now. The batch payment feature saved me 4 hours every month. Absolutely game-changing.", rating: 5, role: "Small Business Owner" },
+               { name: "Tunde B.", handle: "@tunde_fx", text: "Converted USD to Naira at the best rate I've seen, all from a simple WhatsApp text. No more logging into multiple exchange platforms.", rating: 4, role: "Forex Trader" },
+               { name: "Fatima K.", handle: "@fatima_writes", text: "My clients can now pay me through a link I generate in 5 seconds. ChatPay literally doubled my collection rate. Revolutionary product.", rating: 5, role: "Content Creator" },
              ].map((t, i) => (
-               <div key={i} className="bg-[#111b21] border border-[#222d34] min-w-[85vw] sm:min-w-[340px] md:min-w-[400px] p-6 md:p-8 rounded-[2rem] snap-center flex-shrink-0 hover:border-[#25D366]/30 transition-colors">
-                 <div className="flex items-center gap-4 mb-6">
-                   <div className="w-12 h-12 bg-gradient-to-br from-[#128C7E] to-[#075E54] rounded-full shadow-inner" />
-                   <div className="text-left">
-                     <p className="font-bold text-sm md:text-base text-white">{t.name}</p>
-                     <p className="text-xs md:text-sm text-[#25D366]">{t.handle}</p>
+               <FadeInSection key={i} delay={i * 0.1}>
+                 <div className="h-full bg-[#111b21] border border-[#222d34] p-6 md:p-8 rounded-[2rem] hover:border-[#25D366]/30 transition-all duration-300 hover:-translate-y-1 group">
+                   <div className="flex gap-1 mb-4">
+                     {[...Array(t.rating)].map((_, j) => <Star key={j} size={16} className="fill-[#25D366] text-[#25D366]" />)}
+                     {[...Array(5 - t.rating)].map((_, j) => <Star key={j} size={16} className="text-[#222d34]" />)}
+                   </div>
+                   <p className="text-sm md:text-base leading-relaxed text-[#8696a0] mb-6">"{t.text}"</p>
+                   <div className="flex items-center gap-4 pt-4 border-t border-[#222d34]">
+                     <div className="w-12 h-12 bg-gradient-to-br from-[#25D366] to-[#075E54] rounded-full shadow-inner flex items-center justify-center text-white font-black text-lg group-hover:scale-110 transition-transform">
+                       {t.name[0]}
+                     </div>
+                     <div className="text-left">
+                       <p className="font-bold text-sm text-white">{t.name}</p>
+                       <p className="text-xs text-[#8696a0]">{t.role}</p>
+                     </div>
                    </div>
                  </div>
-                 <p className="text-sm md:text-base leading-relaxed text-[#8696a0] text-left">"{t.text}"</p>
-               </div>
+               </FadeInSection>
              ))}
           </div>
         </section>
