@@ -5,18 +5,18 @@
 @tailwind utilities;
 
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1e40af;
-  --secondary: #6366f1;
-  --accent: #f59e0b;
-  --background: #0f172a;
-  --surface: rgba(30, 41, 59, 0.7);
-  --text: #f8fafc;
-  --text-muted: #94a3b8;
-  --success: #10b981;
+  --primary: #25D366;
+  --primary-dark: #128C7E;
+  --secondary: #075E54;
+  --accent: #00A884;
+  --background: #0b141a;
+  --surface: #111b21;
+  --text: #e9edef;
+  --text-muted: #8696a0;
+  --success: #25D366;
   --error: #ef4444;
-  --glass: rgba(255, 255, 255, 0.05);
-  --border: rgba(255, 255, 255, 0.1);
+  --glass: rgba(255, 255, 255, 0.02);
+  --border: #222d34;
   --radius: 16px;
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
