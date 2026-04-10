@@ -27,6 +27,18 @@ app.get('/api/status', (req, res) => {
     });
 });
 
+// Front-end Public API Config
+app.get('/api/config/public', async (req, res) => {
+    try {
+        const { PrismaClient } = await import('@prisma/client');
+        const prisma = new PrismaClient();
+        const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+        res.json({ whatsappNumber: config?.whatsappNumber || '2348000000000' });
+    } catch (e) {
+        res.json({ whatsappNumber: '2348000000000' });
+    }
+});
+
 // WhatsApp webhook (Whapi.cloud)
 app.post('/webhook/whatsapp', WebhookController.handleIncoming);
 

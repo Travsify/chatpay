@@ -406,6 +406,14 @@ const Checkout = () => (
 
 
 const Home = () => {
+  const [waNumber, setWaNumber] = useState('2348000000000');
+  useEffect(() => {
+    fetch('/api/config/public')
+      .then(res => res.json())
+      .then(data => { if (data.whatsappNumber) setWaNumber(data.whatsappNumber) })
+      .catch();
+  }, []);
+
   return (
     <PageWrapper>
       <div className="w-full overflow-hidden">
@@ -422,7 +430,7 @@ const Home = () => {
               <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
             </div>
             <div className="flex items-center gap-4">
-              <a href="https://wa.me/2348000000000?text=Hi" target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-[#25D366]/30 transition-all hover:-translate-y-0.5">
+              <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-[#25D366]/30 transition-all hover:-translate-y-0.5">
                 Launch App
               </a>
             </div>
@@ -456,7 +464,7 @@ const Home = () => {
              </p>
              
              <div className="flex flex-col sm:flex-row items-stretch justify-center gap-4 px-4 sm:px-0">
-               <a href="https://wa.me/2348000000000?text=Hi ChatPay" target="_blank" rel="noopener noreferrer" className="px-6 py-4 md:px-8 md:py-4 bg-[#25D366] text-[#0b141a] rounded-2xl font-black text-base md:text-lg shadow-[0_0_30px_rgba(37,211,102,0.3)] hover:scale-105 transition-all flex items-center justify-center gap-2">
+               <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="px-6 py-4 md:px-8 md:py-4 bg-[#25D366] text-[#0b141a] rounded-2xl font-black text-base md:text-lg hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(37,211,102,0.3)]">
                  <Send size={20} /> Text to Bank
                </a>
                <Link to="/dashboard" className="px-6 py-4 md:px-8 md:py-4 bg-surface border border-border text-white rounded-2xl font-bold text-base md:text-lg hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
@@ -464,11 +472,12 @@ const Home = () => {
                </Link>
              </div>
 
-             <div className="mt-12 md:mt-16 flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 opacity-70 grayscale hover:grayscale-0 transition-all duration-500">
-               <p className="text-xs md:text-sm font-bold tracking-widest uppercase text-[#8696a0]">Banking rails powered By</p>
-               <div className="flex gap-4 md:gap-6 items-center">
-                 <span className="text-lg md:text-xl font-black font-sans tracking-tight text-[#8696a0]">Fincra</span>
-                 <span className="text-lg md:text-xl font-black font-sans tracking-tight text-[#8696a0]">Flutterwave</span>
+             <div className="mt-12 md:mt-16 opacity-70">
+               <p className="text-xs md:text-sm font-bold tracking-widest uppercase text-[#8696a0] mb-4">Core Platform Capabilities</p>
+               <div className="flex flex-wrap justify-center gap-3 md:gap-4 max-w-2xl mx-auto">
+                 {['Virtual Accounts', 'Bill Payments', 'Crypto Trading', 'Gift Card Exchange', 'Escrow Support'].map(chip => (
+                   <span key={chip} className="px-3 py-1.5 rounded-full border border-[#222d34] bg-[#111b21] text-white text-xs md:text-sm font-medium">{chip}</span>
+                 ))}
                </div>
              </div>
            </motion.div>
@@ -669,7 +678,7 @@ const Home = () => {
             <div className="absolute inset-0 bg-gradient-to-t from-[#128C7E]/20 to-transparent pointer-events-none" />
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-black mb-6 relative z-10 tracking-tight text-white">Stop downloading apps.</h2>
             <p className="text-base md:text-lg text-[#8696a0] mb-10 relative z-10 max-w-xl mx-auto">Join the revolution. Turn your WhatsApp into a high-powered financial terminal today.</p>
-            <a href="https://wa.me/2348000000000?text=Hi ChatPay" target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] hover:text-white hover:scale-105 inline-flex py-4 px-8 md:py-5 md:px-10 rounded-2xl font-black text-base md:text-lg relative z-10 transition-all shadow-[0_0_20px_rgba(37,211,102,0.4)]">
+            <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] hover:text-white hover:scale-105 inline-flex py-4 px-8 md:py-5 md:px-10 rounded-2xl font-black text-base md:text-lg relative z-10 transition-all shadow-[0_0_20px_rgba(37,211,102,0.4)]">
               Start Chatting Now
             </a>
           </div>
