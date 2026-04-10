@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Wallet, ShieldCheck, FileText, Send, User, Copy, Check, TrendingUp, CreditCard, ChevronRight } from 'lucide-react';
+import { Wallet, ShieldCheck, FileText, Send, User, Copy, Check, TrendingUp, CreditCard, ChevronRight, ChevronDown, Briefcase, Users, Smartphone } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AreaChart, Area, Tooltip, ResponsiveContainer } from 'recharts';
 import axios from 'axios';
@@ -334,8 +334,7 @@ const Home = () => {
               <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
             </div>
             <div className="flex items-center gap-4">
-              <Link to="/admin" className="hidden md:block text-xs font-bold text-text-muted hover:text-white transition-colors uppercase tracking-widest">God Mode</Link>
-              <a href="https://wa.me/2348000000000?text=Hi" target="_blank" rel="noopener noreferrer" className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5">
+              <a href="https://wa.me/2348000000000?text=Hi" target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-[#25D366]/30 transition-all hover:-translate-y-0.5">
                 Launch App
               </a>
             </div>
@@ -498,6 +497,30 @@ const Home = () => {
           </div>
         </section>
 
+        {/* USE CASES SECTION */}
+        <section className="py-20 md:py-24 px-4 md:px-6 border-y border-[#222d34]">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16 px-2">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 tracking-tight text-white">Who is ChatPay for?</h2>
+              <p className="text-sm md:text-base text-[#8696a0] max-w-2xl mx-auto leading-relaxed">Engineered for velocity. Built to scale across any financial requirement.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+              {[
+                { icon: Briefcase, title: "Freelancers", desc: "Generate professional payment links mapped to your USD virtual account inside a WhatsApp chat.", color: "from-[#25D366] to-[#128C7E]" },
+                { icon: Users, title: "Small Businesses", desc: "Pay salaries, vendors, and manage invoicing without needing multiple banking portals or complex setups.", color: "from-[#00A884] to-[#075E54]" },
+                { icon: Smartphone, title: "Digital Natives", desc: "Split bills with friends, pay for subscriptions, and trade crypto effortlessly while texting.", color: "from-[#128C7E] to-[#005c4b]" }
+              ].map((uc, i) => (
+                <div key={i} className="relative group p-8 bg-[#111b21] rounded-[2.5rem] border border-[#222d34] overflow-hidden hover:border-[#25D366]/40 transition-colors shadow-lg">
+                  <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${uc.color} opacity-10 rounded-bl-[100px] transition-transform group-hover:scale-110`} />
+                  <uc.icon className="text-[#25D366] mb-6" size={36} />
+                  <h3 className="text-xl font-bold mb-3 text-white">{uc.title}</h3>
+                  <p className="text-sm text-[#8696a0] leading-relaxed">{uc.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* TESTIMONIALS */}
         <section id="testimonials" className="py-20 md:py-24 px-4 md:px-6 bg-[#0b141a] overflow-hidden">
           <div className="max-w-7xl mx-auto text-center mb-12 md:mb-16 px-2">
@@ -524,6 +547,30 @@ const Home = () => {
           </div>
         </section>
 
+        {/* FREQUENTLY ASKED QUESTIONS */}
+        <section className="py-20 px-4 md:px-6 max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-black mb-4 text-white">Frequently Asked Questions</h2>
+            <p className="text-[#8696a0]">Everything you need to know about the product and billing.</p>
+          </div>
+          <div className="space-y-4">
+             {[
+               { q: "Is ChatPay actually an app?", a: "No. ChatPay operates completely autonomously natively inside WhatsApp. There is absolutely nothing to download from any App Store." },
+               { q: "Are my funds actually safe?", a: "Yes. Your funds are secured by our NDIC-insured banking partners (Fincra & Flutterwave). We utilize AES-256 military-grade encryption directly inherited from WhatsApp's E2E rails." },
+               { q: "Do I need Wi-Fi or data?", a: "If you have enough data to send a text on WhatsApp, you have enough connectivity to execute a $10,000 international transfer via ChatPay. It requires practically zero bandwidth." },
+               { q: "What happens if I lose my phone?", a: "Your ChatPay wallet is tied to your biometric identity verification (KYC), not your device. Simply recover your WhatsApp number on a new phone and verify your PIN to resume operations." }
+             ].map((faq, i) => (
+               <details key={i} className="group bg-[#111b21] border border-[#222d34] rounded-2xl p-6 cursor-pointer hover:border-[#25D366]/30 transition-colors">
+                 <summary className="flex justify-between items-center font-bold text-white outline-none">
+                   {faq.q}
+                   <ChevronDown size={20} className="text-[#25D366] group-open:rotate-180 transition-transform" />
+                 </summary>
+                 <p className="text-[#8696a0] mt-4 leading-relaxed text-sm">{faq.a}</p>
+               </details>
+             ))}
+          </div>
+        </section>
+
         {/* BOTTOM CTA */}
         <section className="py-24 md:py-32 px-4 md:px-6 bg-[#0b141a]">
           <div className="max-w-5xl mx-auto bg-[#111b21] border border-[#222d34] rounded-[3rem] p-8 md:p-20 text-center relative overflow-hidden shadow-[0_0_40px_rgba(37,211,102,0.1)]">
@@ -536,38 +583,59 @@ const Home = () => {
           </div>
         </section>
 
-        {/* FOOTER */}
+        {/* ROBUST FOOTER */}
         <footer className="border-t border-[#222d34] bg-[#0b141a] pt-16 md:pt-20 pb-8 px-4 md:px-6">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 md:gap-12 mb-16">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-10 md:gap-12 mb-16">
             <div className="col-span-1 sm:col-span-2">
               <div className="flex items-center gap-3 mb-4">
                 <img src="/logo.png" className="w-8 h-8 object-contain" alt="ChatPay" />
                 <span className="font-bold text-xl text-white">ChatPay</span>
               </div>
-              <p className="text-[#8696a0] text-sm max-w-xs leading-relaxed">The autonomous financial engine running purely on API architecture and WhatsApp infrastructure.</p>
+              <p className="text-[#8696a0] text-sm max-w-sm leading-relaxed mb-8">The autonomous financial engine running purely on API architecture and WhatsApp infrastructure. Transforming conversations into seamless financial transactions.</p>
+              
+              <p className="font-bold text-white text-sm mb-3">Join our newsletter</p>
+              <form className="flex gap-2 max-w-sm" onSubmit={(e) => e.preventDefault()}>
+                 <input type="email" required placeholder="Enter your email" className="bg-[#111b21] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white flex-1 focus:outline-none focus:border-[#25D366] transition-colors" />
+                 <button type="submit" className="bg-[#25D366] text-[#0b141a] px-6 rounded-xl font-bold text-sm hover:bg-white transition-colors">Subscribe</button>
+              </form>
             </div>
-            <div>
-              <h4 className="font-bold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-text-muted">
-                <li><Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
-                <li><Link to="/kyc" className="hover:text-white transition-colors">Verification (KYC)</Link></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
+            
+            <div className="md:ml-auto">
+              <h4 className="font-bold mb-6 text-white text-sm tracking-widest uppercase">Platform</h4>
+              <ul className="space-y-4 text-sm text-[#8696a0]">
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Virtual Accounts</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Transfers & P2P</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">AI Invoicing</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Smart Wallets</a></li>
               </ul>
             </div>
-            <div>
-              <h4 className="font-bold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-text-muted">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><Link to="/admin" className="hover:text-white transition-colors">God Mode (Internal)</Link></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+            
+            <div className="md:mx-auto">
+              <h4 className="font-bold mb-6 text-white text-sm tracking-widest uppercase">Company</h4>
+              <ul className="space-y-4 text-sm text-[#8696a0]">
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">About Us</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Careers</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Blog</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Press</a></li>
+              </ul>
+            </div>
+            
+            <div className="md:ml-auto">
+              <h4 className="font-bold mb-6 text-white text-sm tracking-widest uppercase">Legal</h4>
+              <ul className="space-y-4 text-sm text-[#8696a0]">
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Privacy Policy</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Terms of Service</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">AML Policy</a></li>
+                <li><a href="#" className="hover:text-[#25D366] transition-colors">Contact</a></li>
               </ul>
             </div>
           </div>
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-[10px] md:text-xs text-text-muted font-mono pt-8 border-t border-border">
+          
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4 text-[10px] md:text-xs text-[#8696a0] font-mono pt-8 border-t border-[#222d34]">
             <p>© 2026 ChatPay Autonomous Corp.</p>
             <div className="flex gap-4 items-center">
-               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span> STATUS: GREEN</span>
-               <span className="px-2 py-0.5 rounded bg-surface border border-border">v2.4.0</span>
+               <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#25D366] animate-pulse"></span> ALL SYSTEMS GREEN</span>
+               <span className="px-2 py-0.5 rounded bg-[#111b21] border border-[#222d34]">v2.4.0</span>
             </div>
           </div>
         </footer>
@@ -594,7 +662,6 @@ function App() {
                   <span className="font-extrabold text-xl tracking-tighter text-white">ChatPay</span>
                 </Link>
                 <div className="flex gap-2 items-center">
-                  <Link to="/admin" className="hidden md:block text-[10px] font-black text-text-muted hover:text-primary transition-colors uppercase tracking-[0.2em] px-4">God Mode</Link>
                   <Link to="/kyc" className="p-3 hover:bg-white/10 rounded-2xl transition-all border border-white/5"><ShieldCheck size={20} /></Link>
                   <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 hover:border-primary/50 transition-colors cursor-pointer group">
                     <User size={22} className="group-hover:text-primary transition-colors" />
