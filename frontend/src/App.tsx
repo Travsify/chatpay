@@ -65,20 +65,23 @@ const LiveChatMockup = () => {
   const [isTyping, setIsTyping] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: false, margin: '-100px' });
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!inView) { setVisibleCount(0); return; }
     let idx = 0;
+    let cancelled = false;
     const showNext = () => {
+      if (cancelled) return;
       if (idx >= chatMessages.length) {
-        setTimeout(() => { setVisibleCount(0); idx = 0; showNext(); }, 4000);
+        setTimeout(() => { if (!cancelled) { setVisibleCount(0); idx = 0; showNext(); } }, 4000);
         return;
       }
       const msg = chatMessages[idx];
       if (msg.type === 'bot') {
         setIsTyping(true);
         setTimeout(() => {
+          if (cancelled) return;
           setIsTyping(false);
           idx++;
           setVisibleCount(idx);
@@ -91,15 +94,18 @@ const LiveChatMockup = () => {
       }
     };
     const t = setTimeout(showNext, 500);
-    return () => clearTimeout(t);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [inView]);
 
+  // Scroll ONLY inside the chat container, never the page
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [visibleCount, isTyping]);
 
   return (
-    <div ref={ref} className="w-full max-w-[320px] sm:max-w-sm mx-auto bg-[#0b141a] border border-[#222d34] rounded-[2.5rem] p-3 md:p-4 pb-8 relative shadow-[0_0_50px_rgba(37,211,102,0.15)] ring-8 ring-[#111b21] overflow-hidden">
+    <div ref={ref} className="w-full max-w-[320px] sm:max-w-sm mx-auto bg-[#0b141a] border border-[#222d34] rounded-[2.5rem] p-3 md:p-4 pb-4 relative shadow-[0_0_50px_rgba(37,211,102,0.15)] ring-8 ring-[#111b21] overflow-hidden">
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 md:w-40 h-6 bg-[#111b21] rounded-b-3xl mb-4 z-10" />
       <div className="bg-[#111b21] h-14 -mx-4 -mt-4 mb-2 flex items-center px-4 gap-3 border-b border-[#222d34]">
         <div className="w-8 h-8 rounded-full bg-[#25D366] flex items-center justify-center p-1"><img src="/logo.png" className="w-6 h-6 object-contain filter brightness-0 invert" alt="logo"/></div>
@@ -108,14 +114,14 @@ const LiveChatMockup = () => {
           <p className="text-[#25D366] text-[10px] font-medium">{isTyping ? 'typing...' : 'Online'}</p>
         </div>
       </div>
-      <div className="mt-6 space-y-3 px-1 pb-4 min-h-[320px] max-h-[380px] overflow-y-auto hide-scrollbar">
+      <div ref={scrollRef} className="mt-6 space-y-3 px-1 pb-2 h-[340px] overflow-y-auto hide-scrollbar scroll-smooth">
         <AnimatePresence>
           {chatMessages.slice(0, visibleCount).map((msg, i) => (
             <motion.div
-              key={`${visibleCount > chatMessages.length ? 'r' : ''}${i}`}
-              initial={{ opacity: 0, y: 20, scale: 0.9 }}
+              key={`msg-${i}`}
+              initial={{ opacity: 0, y: 12, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
               className={msg.type === 'user'
                 ? 'bg-[#005c4b] text-[#e9edef] rounded-2xl rounded-tr-sm p-3 w-fit ml-auto text-[13px] shadow-sm max-w-[85%]'
                 : `bg-[#202c33] ${msg.success ? 'border-l-2 border-[#25D366]' : ''} text-[#e9edef] rounded-2xl rounded-tl-sm p-3 w-[85%] text-[13px] shadow-sm`
@@ -127,7 +133,6 @@ const LiveChatMockup = () => {
           ))}
         </AnimatePresence>
         {isTyping && <TypingIndicator />}
-        <div ref={chatEndRef} />
       </div>
     </div>
   );
