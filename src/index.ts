@@ -7,6 +7,7 @@ import { WebhookController } from './controllers/webhook.controller.js';
 import { AdminController } from './controllers/admin.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
 import { authMiddleware, requireRole } from './middleware/auth.middleware.js';
+import prisma from './utils/prisma.js';
 
 dotenv.config();
 
@@ -30,7 +31,6 @@ app.get('/api/status', (req, res) => {
 // Front-end Public API Config
 app.get('/api/config/public', async (req, res) => {
     try {
-        const prisma = (await import('./utils/prisma.js')).default;
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
         res.json({ whatsappNumber: config?.whatsappNumber || '2348026990956' });
     } catch (e) {
