@@ -9,8 +9,21 @@ export class WhapiService {
         this.token = process.env.WHAPI_TOKEN || '';
     }
 
+    private async getToken() {
+        if (this.token && this.token !== '' && this.token !== 'your_whapi_token_here') return this.token;
+        
+        try {
+            const prisma = (await import('../utils/prisma')).default;
+            const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            return config?.whapiToken || this.token;
+        } catch (e) {
+            return this.token;
+        }
+    }
+
     async sendMessage(to: string, body: string) {
-        if (!this.token || this.token === 'your_whapi_token_here') {
+        const token = await this.getToken();
+        if (!token || token === 'your_whapi_token_here') {
             console.log(`[MOCK WHAPI] Sending to ${to}: ${body}`);
             return { sent: true, mock: true };
         }
@@ -21,7 +34,7 @@ export class WhapiService {
                 body: body
             }, {
                 headers: {
-                    'Authorization': `Bearer ${this.token}`,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });
@@ -33,6 +46,7 @@ export class WhapiService {
     }
 
     async sendImage(to: string, mediaUrl: string, caption?: string) {
+        const token = await this.getToken();
         try {
             const response = await axios.post(`${this.apiUrl}/messages/image`, {
                 to: to,
@@ -40,7 +54,7 @@ export class WhapiService {
                 caption: caption
             }, {
                 headers: {
-                    'Authorization': `Bearer ${this.token}`,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 }
             });

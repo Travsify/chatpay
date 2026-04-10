@@ -82,6 +82,14 @@ export class WebhookController {
             await WebhookController.logWebhook('OUTBOUND', phoneNumber, JSON.stringify({ body: message }), 'PROCESSED');
         };
 
+        // 0. New User Global Entry
+        if (!user.name && user.kycStatus === 'PENDING' && session.currentState === 'START' && aiResult.intent !== 'SIGNUP') {
+            const welcomeMsg = `✨ *Welcome to ChatPay!* ✨\n\nYour autonomous financial companion natively inside WhatsApp.\n\n*What I can do for you:*\n🏦 *Virtual Accounts*: Local & International bank details.\n🚀 *Transfers*: Swift payments to any Nigerian bank.\n💡 *Bills*: Airtime, Data, & Utility payments.\n₿ *Crypto & Cards*: Trade assets & gift cards instantly.\n\nTo get started with your secure wallet, please tell me your *Full Name*:`;
+            await sendAndLog(welcomeMsg, 'WELCOME_ONBOARDING');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
+            return;
+        }
+
         // 1. Check Ongoing Flow States
         if (session.currentState === 'AWAITING_NAME') {
             await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
@@ -153,13 +161,21 @@ export class WebhookController {
             return;
         }
 
+        if (rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help') {
+            const menuMsg = `🏦 *ChatPay Command Menu*\n\n💰 *Check Balance*: "Balance"\n🚀 *Send Money*: "Send 5k to John"\n💡 *Pay Bills*: "Pay DSTV" or "Buy Airtime"\n📄 *Invoicing*: "Create invoice of 20k"\n₿ *Trade Crypto*: "Buy $20 USDT"\n📜 *Redeem Cards*: "Sell Amazon card"\n\nHow can I help you right now?`;
+            await sendAndLog(menuMsg, 'HELP_MENU');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
+            return;
+        }
+
         // 2. Process Intent
         switch (aiResult.intent) {
             case 'SIGNUP':
                 if (user.kycStatus === 'VERIFIED') {
-                    await sendAndLog(`You're all set, ${user.name}!`, 'SIGNUP_EXISTS');
+                    await sendAndLog(`Welcome back, ${user.name || 'valued customer'}! 🏦\n\nYour balance is currently up to date. How can I assist you today?\n\n- 💰 Check Balance\n- 🚀 Send Money\n- 💡 Pay Bills\n- 📄 Create Invoice`, 'SIGNUP_EXISTS');
                 } else {
-                    await sendAndLog(`Welcome! Let's start. What is your full name?`, 'SIGNUP_START');
+                    const welcomeMsg = `✨ *Welcome to ChatPay!* ✨\n\nYour autonomous financial companion natively inside WhatsApp.\n\n*What I can do for you:*\n🏦 *Virtual Accounts*: Local & International bank details.\n🚀 *Transfers*: Swift payments to any Nigerian bank.\n💡 *Bills*: Airtime, Data, & Utility payments.\n₿ *Crypto & Cards*: Trade assets & gift cards instantly.\n\nTo get started with your secure wallet, please tell me your *Full Name*:`;
+                    await sendAndLog(welcomeMsg, 'SIGNUP_START');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
                 }
                 break;

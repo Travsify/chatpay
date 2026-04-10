@@ -15,16 +15,25 @@ export interface IntentResult {
 export class AiService {
     private openai: OpenAI;
 
-    constructor() {
-        if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_openai_api_key_here') {
-            this.openai = new OpenAI({
-                apiKey: process.env.OPENAI_API_KEY
-            });
-        }
+    private async getOpenAI(): Promise<OpenAI | null> {
+        if (this.openai) return this.openai;
+        
+        try {
+            const prisma = (await import('../utils/prisma')).default;
+            const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            const key = config?.openaiKey || process.env.OPENAI_API_KEY;
+            
+            if (key && key !== 'your_openai_api_key_here' && key !== '') {
+                this.openai = new OpenAI({ apiKey: key });
+                return this.openai;
+            }
+        } catch (e) {}
+        return null;
     }
 
     async parseIntent(message: string, context?: any): Promise<IntentResult> {
-        if (!this.openai) {
+        const openai = await this.getOpenAI();
+        if (!openai) {
             console.log(`[MOCK AI] No API key, using mock for: "${message}"`);
             const lower = message.toLowerCase();
             if (lower.includes('sign') || lower.includes('hi')) return { intent: 'SIGNUP' };
@@ -41,7 +50,7 @@ export class AiService {
                 Example: "Send 5k to John" -> { "intent": "SEND_FUNDS", "entities": { "amount": 5000, "recipient": "John" } }
             `;
 
-            const response = await this.openai.chat.completions.create({
+            const response = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
                     { role: "system", content: systemPrompt },
@@ -59,11 +68,12 @@ export class AiService {
     }
 
     async generateResponse(prompt: string): Promise<string> {
-        if (!this.openai) {
+        const openai = await this.getOpenAI();
+        if (!openai) {
             return "Mock AI Response: How can I help you with your ChatPay wallet today?";
         }
         try {
-            const response = await this.openai.chat.completions.create({
+            const response = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [{ role: "user", content: prompt }]
             });
