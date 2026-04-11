@@ -57,6 +57,8 @@ export class WebhookController {
                         console.error('[Voice] Failed:', e);
                         rawText = 'VOICE_TRANSCRIPTION_FAILED';
                     }
+                } else if (msg.type === 'call_log' || msg.type === 'system') {
+                    rawText = 'SYSTEM_CALL_REJECTED';
                 } else {
                     rawText = msg.text?.body || '';
                 }
@@ -126,6 +128,11 @@ export class WebhookController {
         };
 
         // 0. Global Priority Commands (Reset, Menu, Help)
+        if (rawText === 'SYSTEM_CALL_REJECTED') {
+            await sendAndLog(`Hello! 🤖 I am ChatPay's AI Assistant. I operate natively inside WhatsApp, but I cannot answer voice or video calls on this line.\n\nPlease type your message or send a voice note, and I will assist you instantly!`, 'CALL_REJECTED');
+            return;
+        }
+
         const isMenu = rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText === 'HOME' || rawText.toLowerCase() === 'home';
         const isHi = rawText.toLowerCase().includes('hi') || rawText.toLowerCase().includes('hello');
         
@@ -213,6 +220,7 @@ export class WebhookController {
                     } 
                 });
                 
+                await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please long-press and delete your previous message containing your BVN/NIN to protect yourself from unauthorized access to your device.`, 'KYC_SECURITY_NOTICE');
                 await sendAndLog(`Verified! ✅ Finalizing your ${isBusiness ? 'Business' : 'Individual'} wallet setup...`, 'KYC_VERIFIED');
                 try {
                     const wallet = await WalletService.setupUserWallet(user.id, isBusiness ? 'business' : 'individual', context.businessName);
