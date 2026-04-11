@@ -11,7 +11,7 @@ import {
 import { AreaChart, Area, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // ===== AUTH CONTEXT =====
 const useAuth = () => {
@@ -909,6 +909,17 @@ const HealthTab = ({ api }: { api: any }) => {
           </div>
           <p className="text-2xl font-black text-white">{health?.nodeVersion || 'Unknown'}</p>
           <p className="text-xs text-[#8696a0] mt-1">Runtime version</p>
+        </div>
+
+        <div className="bg-[#111b21] border border-[#222d34] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <MessageSquare size={16} className="text-[#25D366]" />
+            <span className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest">Whapi Channel</span>
+          </div>
+          <p className={`text-xl font-black ${health?.whapi?.authenticated ? 'text-[#25D366]' : 'text-red-400'}`}>
+            {health?.whapi?.authenticated ? 'Authenticated' : 'Offline'}
+          </p>
+          <p className="text-xs text-[#8696a0] mt-1">{health?.whapi?.status || 'Check Whapi Panel'}</p>
         </div>
 
         <div className="bg-[#111b21] border border-[#222d34] rounded-2xl p-5">

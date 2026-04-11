@@ -629,9 +629,11 @@ export class AdminController {
             const activeSessions = await prisma.session.count({
                 where: { updatedAt: { gte: fifteenMinAgo } }
             });
+            // Check Whapi Health
+            const whapiHealth = await whapiService.getChannelHealth();
 
             res.json({
-                status: 'OPERATIONAL',
+                status: (whapiHealth.status === 'ERROR' || !whapiHealth.authenticated) ? 'DEGRADED' : 'OPERATIONAL',
                 dbLatencyMs: dbLatency,
                 activeSessions,
                 lastWebhook: lastWebhook ? {
@@ -645,6 +647,7 @@ export class AdminController {
                 uptime: process.uptime(),
                 memoryUsage: process.memoryUsage(),
                 nodeVersion: process.version,
+                whapi: whapiHealth,
                 timestamp: new Date().toISOString()
             });
         } catch (error) {

@@ -104,6 +104,17 @@ export class WhapiService {
             throw error;
         }
     }
+    async getChannelHealth() {
+        const token = await this.getToken();
+        try {
+            const response = await axios.get(`${this.apiUrl}/health`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return response.data;
+        } catch (error: any) {
+             return { status: 'ERROR', error: error.response?.data || error.message };
+        }
+    }
 }
 
 export const whapiService = new WhapiService();
