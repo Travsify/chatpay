@@ -144,7 +144,7 @@ export class WebhookController {
         }
 
         if (isMenu || (isHi && session.currentState === 'START')) {
-            if (!user.name || session.currentState === 'START') {
+            if (!user.name || user.kycStatus !== 'VERIFIED') {
                 const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion. I don't just manage your money; I help you conquer the global financial landscape right here on WhatsApp.\n\n*Here is what I can do for you right now:*\n🌍 *Multi-Currency Accounts*: Get instant NGN/USD/EUR/GBP banking details.\n💸 *High-Speed Transfers*: Move funds to any Nigerian bank in seconds.\n💡 *Smart Bills*: One-tap payments for Airtime, Data, and Power.\n💳 *USD Virtual Cards*: Shop globally with our Master/Visa cards.\n₿ *Crypto Transactions*: Buy/Sell BTC & USDT at the best market rates.\n🎁 *Asset Trading*: Trade your Gift Cards for instant cash.\n\n*To activate your secure global vault and experience the future of banking, what is your Full Name?*`;
                 try {
                     await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", [
