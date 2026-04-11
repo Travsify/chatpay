@@ -6,7 +6,10 @@ import { FlutterwaveService } from '../services/flutterwave.service.js';
 import { quidaxService } from '../services/quidax.service.js';
 import { mapleradService } from '../services/maplerad.service.js';
 import { pressMntService } from '../services/pressmnt.service.js';
+import { VoiceService } from '../services/voice.service.js';
 import prisma from '../utils/prisma.js';
+import fs from 'fs';
+import path from 'path';
 
 export class WebhookController {
     
@@ -20,43 +23,55 @@ export class WebhookController {
                 if (msg.from_me) continue;
 
                 const senderNumber = msg.from;
-                const messageText = msg.text?.body;
+                let rawText = '';
+                let isAudio = false;
 
-                if (!messageText) continue;
+                // 1. Unified Extraction (Text, Voice, Buttons)
+                if (msg.type === 'action' && msg.action?.id) {
+                    rawText = msg.action.id;
+                } else if (msg.type === 'audio' || msg.type === 'voice') {
+                    isAudio = true;
+                    try {
+                        const buffer = await whapiService.getFileBuffer(msg.audio?.id || msg.voice?.id);
+                        const tmp = path.join(process.cwd(), `voice_${senderNumber}.ogg`);
+                        fs.writeFileSync(tmp, buffer);
+                        rawText = await VoiceService.transcribe(tmp);
+                        fs.unlinkSync(tmp);
+                        console.log(`[Voice] ${senderNumber}: ${rawText}`);
+                    } catch (e) {
+                        console.error('[Voice] Failed:', e);
+                        rawText = 'VOICE_TRANSCRIPTION_FAILED';
+                    }
+                } else {
+                    rawText = msg.text?.body || '';
+                }
+
+                if (!rawText) continue;
 
                 // Log inbound webhook
                 await WebhookController.logWebhook('INBOUND', senderNumber, JSON.stringify(msg), 'RECEIVED', Date.now() - startTime);
 
                 let user = await prisma.user.findUnique({ where: { phoneNumber: senderNumber } });
-                if (!user) {
-                    user = await prisma.user.create({ data: { phoneNumber: senderNumber } });
-                }
+                if (!user) user = await prisma.user.create({ data: { phoneNumber: senderNumber } });
 
-                let session = await prisma.session.findFirst({
-                    where: { userId: user.id },
-                    orderBy: { updatedAt: 'desc' }
-                });
+                let session = await prisma.session.findFirst({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } });
+                if (!session) session = await prisma.session.create({ data: { userId: user.id, currentState: 'START' } });
 
-                if (!session) {
-                    session = await prisma.session.create({ data: { userId: user.id, currentState: 'START' } });
-                }
-
-                // Log inbound conversation
-                const aiResult = await aiService.parseIntent(messageText);
+                const aiResult = await aiService.parseIntent(rawText);
 
                 await prisma.conversationLog.create({
                     data: {
                         userId: user.id,
                         direction: 'INBOUND',
-                        message: messageText,
+                        message: rawText,
                         intent: aiResult.intent,
                         confidence: null
                     }
                 });
 
-                await WebhookController.processLogic(user, session, aiResult, messageText);
+                await WebhookController.processLogic(user, session, aiResult, rawText, isAudio);
 
-                // Mark webhook as processed
+                // Mark processed
                 await WebhookController.logWebhook('INBOUND', senderNumber, '', 'PROCESSED', Date.now() - startTime);
             }
 
@@ -68,12 +83,21 @@ export class WebhookController {
         }
     }
 
-    private static async processLogic(user: any, session: any, aiResult: any, rawText: string) {
+    private static async processLogic(user: any, session: any, aiResult: any, rawText: string, isAudio: boolean = false) {
         const { phoneNumber } = user;
 
-        // Helper to send + log outbound messages
+        // Helper to send + log outbound messages (Hybrid Text/Voice)
         const sendAndLog = async (message: string, intent?: string) => {
-            await whapiService.sendMessage(phoneNumber, message);
+            if (isAudio) {
+                try {
+                    const audioBuffer = await VoiceService.textToSpeech(message);
+                    await whapiService.sendAudio(phoneNumber, audioBuffer);
+                } catch (e) {
+                    await whapiService.sendMessage(phoneNumber, message);
+                }
+            } else {
+                await whapiService.sendMessage(phoneNumber, message);
+            }
             await prisma.conversationLog.create({
                 data: {
                     userId: user.id,
@@ -233,10 +257,26 @@ export class WebhookController {
         }
 
         if (rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText.toLowerCase().includes('hi')) {
-            const menuMsg = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nYour finances, now entirely natively on WhatsApp.\n\n*Our Ecosystem:*\n🏦 *Banking*: Individual & Fixed Business Virtual Accounts.\n🌐 *Dollar Cards*: Instant USD Virtual Cards for global payments.\n💸 *Transfers*: Swift local & foreign payouts.\n💡 *Bills*: Airtime, Data, & utilities.\n₿ *Crypto & Cards*: Trade BTC/USDT & Gift Cards instantly.\n\n*Try these commands:*\n- "Check my balance"\n- "Send 5k to John"\n- "Buy $20 USDT"\n- "Create a USD card"\n- "Pay DSTV bill"\n\nHow can I help you right now?`;
-            await sendAndLog(menuMsg, 'HELP_MENU');
+            const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nManaging your finances has never been this easy. Please select an action from the menu below:`;
+            await whapiService.sendList(user.phoneNumber, menuTxt, "Open Menu", [
+                { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your current funds" },
+                { id: "SEND_MONEY_FLOW", title: "💸 Send Money", description: "Transfer to any bank" },
+                { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, Power" },
+                { id: "CREATE_CARD", title: "💳 Virtual Cards", description: "USD Global Shopping Card" },
+                { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
+                { id: "OPEN_ACCOUNT_USD", title: "🌍 Open USD Account", description: "Get a US Bank Account" }
+            ]);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
             return;
+        }
+
+        // Map Button IDs to Intent logic
+        if (rawText === 'SEND_MONEY_FLOW') {
+            await sendAndLog(`Okay! Who are we sending money to? Just tell me the name and amount (e.g., "Send 5k to John")`, 'TRANSFER_PROMPT');
+            return;
+        }
+        if (rawText === 'OPEN_ACCOUNT_USD') {
+            rawText = "Open a USD account"; // Force AI to process this
         }
 
         // 2. Process Intent

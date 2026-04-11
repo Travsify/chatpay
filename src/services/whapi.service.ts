@@ -139,6 +139,66 @@ export class WhapiService {
             throw error;
         }
     }
+    async getFileBuffer(fileId: string): Promise<Buffer> {
+        const token = await this.getToken();
+        const apiUrl = await this.getUrl();
+        try {
+            const response = await axios.get(`${apiUrl}/media/${fileId}`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+                responseType: 'arraybuffer'
+            });
+            return Buffer.from(response.data);
+        } catch (error: any) {
+            console.error('[Whapi] Media download failed:', error.message);
+            throw error;
+        }
+    }
+
+    async sendAudio(to: string, audioBuffer: Buffer) {
+        const token = await this.getToken();
+        const apiUrl = await this.getUrl();
+        try {
+            // WHAPI uses base64 for direct buffer uploads
+            const base64 = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
+            const response = await axios.post(`${apiUrl}/messages/audio`, {
+                to,
+                media: base64
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Whapi] Audio send failed:', error.response?.data || error.message);
+        }
+    }
+
+    async sendList(to: string, text: string, buttonText: string, rows: { id: string; title: string; description?: string }[]) {
+        const token = await this.getToken();
+        const apiUrl = await this.getUrl();
+        try {
+            const response = await axios.post(`${apiUrl}/messages/list`, {
+                to,
+                body: text,
+                button: buttonText,
+                sections: [{
+                    title: "Options",
+                    rows: rows
+                }]
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Whapi] List send failed:', error.response?.data || error.message);
+        }
+    }
+
     async getChannelHealth() {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
