@@ -4,80 +4,162 @@ import prisma from '../utils/prisma.js';
 export class FincraService {
     private async getApiKey() {
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-        return config?.fincraSecret || process.env.FINCRA_API_KEY || '';
+        return config?.fincraSecret || process.env.FINCRA_SECRET_KEY || '';
     }
 
-    private async getBaseUrl() {
-        const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-        return config?.whapiApiUrl?.includes('sandbox') ? 'https://sandbox-api.fincra.com' : 'https://api.fincra.com';
+    private getBaseUrl() {
+        return 'https://api.fincra.com';
     }
 
-    async createCustomer(data: { firstName: string, lastName: string, email: string, phoneNumber: string, type: 'individual' | 'business' }) {
+    /**
+     * Create an NGN virtual account directly (no separate customer step needed).
+     * Endpoint: POST /profile/virtual-accounts/requests
+     * Docs: https://docs.fincra.com/docs/ngn-virtual-account
+     */
+    async createVirtualAccount(data: {
+        firstName: string,
+        lastName: string,
+        email: string,
+        bvn?: string,
+        accountType: 'individual' | 'corporate',
+        currency?: string,
+        channel?: string,
+        merchantReference?: string,
+        businessName?: string
+    }) {
         try {
             const apiKey = await this.getApiKey();
-            const baseUrl = await this.getBaseUrl();
-            const response = await axios.post(`${baseUrl}/profile/customers`, data, {
-                headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
+            const baseUrl = this.getBaseUrl();
+
+            const payload: any = {
+                currency: data.currency || 'NGN',
+                accountType: data.accountType,
+                KYCInformation: {
+                    firstName: data.firstName,
+                    lastName: data.lastName,
+                    email: data.email,
+                }
+            };
+
+            // BVN is required for NGN accounts
+            if (data.bvn) {
+                payload.KYCInformation.bvn = data.bvn;
+            }
+
+            // Channel: wema (individual default), globus (corporate)
+            if (data.channel) {
+                payload.channel = data.channel;
+            }
+
+            // For corporate accounts
+            if (data.accountType === 'corporate' && data.businessName) {
+                payload.KYCInformation.businessName = data.businessName;
+                payload.KYCInformation.bvnName = `${data.firstName} ${data.lastName}`;
+            }
+
+            if (data.merchantReference) {
+                payload.merchantReference = data.merchantReference;
+            }
+
+            console.log('[Fincra] Creating virtual account:', JSON.stringify(payload));
+            
+            const response = await axios.post(`${baseUrl}/profile/virtual-accounts/requests`, payload, {
+                headers: { 
+                    'api-key': apiKey, 
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
             });
+
+            console.log('[Fincra] Virtual account created:', JSON.stringify(response.data));
             return response.data;
         } catch (error: any) {
-            console.error('Error creating Fincra customer:', error.response?.data || error.message);
+            console.error('[Fincra] Error creating virtual account:', error.response?.status, error.response?.data || error.message);
             throw error;
         }
     }
 
-    async createVirtualAccount(data: { currency: string, accountType: 'default' | 'mapped', customerId: string }) {
+    /**
+     * Get a specific virtual account by ID.
+     * Endpoint: GET /profile/virtual-accounts/:id
+     */
+    async getVirtualAccount(virtualAccountId: string) {
         try {
             const apiKey = await this.getApiKey();
-            const baseUrl = await this.getBaseUrl();
-            const response = await axios.post(`${baseUrl}/profile/virtual-accounts`, data, {
-                headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.get(`${baseUrl}/profile/virtual-accounts/${virtualAccountId}`, {
+                headers: { 'api-key': apiKey, 'Accept': 'application/json' }
             });
             return response.data;
         } catch (error: any) {
-            console.error('Error creating Fincra virtual account:', error.response?.data || error.message);
-            throw error;
-        }
-    }
-    
-    async listVirtualAccounts(customerId: string) {
-        try {
-            const apiKey = await this.getApiKey();
-            const baseUrl = await this.getBaseUrl();
-            const response = await axios.get(`${baseUrl}/profile/virtual-accounts?customer=${customerId}`, {
-                headers: { 'api-key': apiKey }
-            });
-            return response.data;
-        } catch (error: any) {
-            console.error('Error listing Fincra virtual accounts:', error.response?.data || error.message);
+            console.error('[Fincra] Error fetching virtual account:', error.response?.data || error.message);
             throw error;
         }
     }
 
-    async getWalletBalance(walletId: string) {
+    /**
+     * List all virtual accounts for the merchant.
+     * Endpoint: GET /profile/virtual-accounts/?currency=ngn
+     */
+    async listVirtualAccounts(currency: string = 'ngn') {
         try {
             const apiKey = await this.getApiKey();
-            const baseUrl = await this.getBaseUrl();
-            const response = await axios.get(`${baseUrl}/profile/wallets/${walletId}`, {
-                headers: { 'api-key': apiKey }
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.get(`${baseUrl}/profile/virtual-accounts/?currency=${currency}`, {
+                headers: { 'api-key': apiKey, 'Accept': 'application/json' }
             });
             return response.data;
         } catch (error: any) {
-            console.error('Error fetching Fincra wallet balance:', error.response?.data || error.message);
+            console.error('[Fincra] Error listing virtual accounts:', error.response?.data || error.message);
             throw error;
         }
     }
 
-    async transferFunds(data: { amount: number, currency: string, destinationAddress: string, paymentDestination: 'fincra_wallet' | 'bank_account' }) {
+    /**
+     * Get merchant wallet balances.
+     * Endpoint: GET /wallets
+     */
+    async getWalletBalance() {
         try {
             const apiKey = await this.getApiKey();
-            const baseUrl = await this.getBaseUrl();
-            const response = await axios.post(`${baseUrl}/profile/disbursements`, data, {
-                headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.get(`${baseUrl}/wallets`, {
+                headers: { 'api-key': apiKey, 'Accept': 'application/json' }
             });
             return response.data;
         } catch (error: any) {
-            console.error('Error transferring funds via Fincra:', error.response?.data || error.message);
+            console.error('[Fincra] Error fetching wallet balance:', error.response?.data || error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Send a payout (bank transfer).
+     * Endpoint: POST /disbursements/payouts
+     */
+    async transferFunds(data: { 
+        amount: number, 
+        currency: string, 
+        destinationAddress: string, 
+        paymentDestination: 'bank_account',
+        beneficiary: {
+            firstName: string,
+            lastName: string,
+            accountNumber: string,
+            accountHolderName: string,
+            bankCode: string,
+            type: 'individual' | 'corporate'
+        }
+    }) {
+        try {
+            const apiKey = await this.getApiKey();
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/disbursements/payouts`, data, {
+                headers: { 'api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fincra] Error transferring funds:', error.response?.data || error.message);
             throw error;
         }
     }
