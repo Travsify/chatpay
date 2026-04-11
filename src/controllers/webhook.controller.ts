@@ -166,9 +166,9 @@ export class WebhookController {
         // ===== GLOBAL PRIORITY: START AFRESH (Before Mapping) =====
         if (rawText.toLowerCase() === 'reset' || rawText === 'RESTART_FLOW' || rawText === 'START_OVER') {
             await prisma.session.deleteMany({ where: { userId: user.id } });
-            await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING', fincraWalletId: null, fincraCustomerId: null } });
+            await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING', fincraWalletId: null, fincraCustomerId: null, transactionPin: null } });
             
-            const restartMsg = "✨ *ChatPay Onboarding Restarted:* All previous steps cleared. Please provide your **Full Legal Name** as it appears on your ID/BVN to begin again:";
+            const restartMsg = "✨ *ChatPay Home:* Your session has been reset. You've been brought back to the main menu. Say 'Hi' to continue.";
             await whapiService.sendMessage(phoneNumber, restartMsg);
             return;
         }
