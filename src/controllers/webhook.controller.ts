@@ -3,6 +3,9 @@ import { whapiService } from '../services/whapi.service.js';
 import { aiService } from '../services/ai.service.js';
 import { WalletService } from '../services/wallet.service.js';
 import { FlutterwaveService } from '../services/flutterwave.service.js';
+import { quidaxService } from '../services/quidax.service.js';
+import { mapleradService } from '../services/maplerad.service.ts';
+import { pressMntService } from '../services/pressmnt.service.js';
 import prisma from '../utils/prisma.js';
 
 export class WebhookController {
@@ -219,8 +222,8 @@ export class WebhookController {
             return;
         }
 
-        if (rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help') {
-            const menuMsg = `🏦 *ChatPay Command Menu*\n\n💰 *Check Balance*: "Balance"\n🚀 *Send Money*: "Send 5k to John"\n💡 *Pay Bills*: "Pay DSTV" or "Buy Airtime"\n📄 *Invoicing*: "Create invoice of 20k"\n₿ *Trade Crypto*: "Buy $20 USDT"\n📜 *Redeem Cards*: "Sell Amazon card"\n\nHow can I help you right now?`;
+        if (rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText.toLowerCase().includes('hi')) {
+            const menuMsg = `🏦 *ChatPay Command Menu*\n\n💰 *Wallets*: "Check Balance"\n🚀 *Send Money*: "Send 5k to John"\n💡 *Bills*: "Pay DSTV" or "Buy Airtime"\n🌐 *International*: "Create USD Card"\n₿ *Crypto*: "Buy $20 USDT"\n📜 *Giftcards*: "Sell Amazon card"\n📄 *Invoicing*: "Create 20k invoice"\n\nHow can I help you right now?`;
             await sendAndLog(menuMsg, 'HELP_MENU');
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
             return;
@@ -311,6 +314,45 @@ export class WebhookController {
                         });
 
                         await sendAndLog(`Invoice Created! 📄\nAmount: ₦${amount}\nDescription: ${description || 'Services'}\nLink: ${invoiceLink}\n\nSend this link to your customer to get paid.`, 'INVOICE_CREATED');
+                    }
+                }
+                break;
+
+            case 'CRYPTO':
+                if (user.kycStatus !== 'VERIFIED') {
+                    await sendAndLog(`Please verify your identity first to trade crypto.`, 'UNVERIFIED_ATTEMPT');
+                } else {
+                    const { amount, asset } = aiResult.entities || {};
+                    if (!amount || !asset) {
+                        await sendAndLog(`Please specify the amount (in USD) and asset (USDT/BTC).`, 'MISSING_ENTITIES');
+                    } else {
+                        await sendAndLog(`Executing Market Buy for $${amount} *${asset.toUpperCase()}*... ₿ 🚀`, 'CRYPTO_PROCESSING');
+                        try {
+                            const result = await quidaxService.buyCrypto(user.id, asset, parseFloat(String(amount)));
+                            await sendAndLog(`Success! ✅ Your ${asset.toUpperCase()} has been purchased. Ref: ${result.data?.id || 'PROCESSED'}`, 'CRYPTO_SUCCESS');
+                        } catch (e: any) {
+                            await sendAndLog(`Trade failed: ${e.message}`, 'CRYPTO_FAILED');
+                        }
+                    }
+                }
+                break;
+
+            case 'GIFTCARD':
+                const cardTypes = await pressMntService.getGiftCardRates();
+                const rateList = cardTypes.map(c => `• ${c.name}: ${c.rate}`).join('\n');
+                await sendAndLog(`🎁 *Gift Card Desk*\n\nOur current rates:\n${rateList}\n\nTo sell a card, please type: "Sell [Type] Card [Amount]" (e.g., Sell Amazon Card $50)`, 'GIFTCARD_RATES');
+                break;
+
+            case 'CARD':
+                if (user.kycStatus !== 'VERIFIED') {
+                    await sendAndLog(`Verify your account to create Virtual Cards.`, 'UNVERIFIED_ATTEMPT');
+                } else {
+                    await sendAndLog(`🌐 *Virtual Card Creation*\n\nInitiating your USD Master/Visa card... 💳`, 'CARD_START');
+                    try {
+                        const card = await mapleradService.createVirtualCard(user.id, 'USD', 10); // Default $10 funding
+                        await sendAndLog(`Success! 🛡️ Your USD Virtual Card is active.\nType *"My Cards"* to see details.`, 'CARD_SUCCESS');
+                    } catch (e: any) {
+                        await sendAndLog(`Card issuance failed: ${e.message}`, 'CARD_FAILED');
                     }
                 }
                 break;

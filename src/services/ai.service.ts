@@ -45,10 +45,12 @@ export class AiService {
             const systemPrompt = `
                 You are ChatPay AI, a financial assistant. 
                 Extract the user's intent and entities from their message.
-                Intents: SIGNUP, SEND_FUNDS, PAY_BILL, CHECK_BALANCE, INVOICE, UNKNOWN.
+                Intents: SIGNUP, SEND_FUNDS, PAY_BILL, CHECK_BALANCE, INVOICE, CRYPTO, CARD, GIFTCARD, UNKNOWN.
                 Return JSON only.
-                Example: "Create invoice for 50k for logo design" -> { "intent": "INVOICE", "entities": { "amount": 50000, "description": "logo design" } }
-                Example: "Send 5k to John" -> { "intent": "SEND_FUNDS", "entities": { "amount": 5000, "recipient": "John" } }
+                Example: "Buy $50 USDT" -> { "intent": "CRYPTO", "entities": { "amount": 50, "asset": "USDT" } }
+                Example: "Create virtual card" -> { "intent": "CARD" }
+                Example: "Redeem Amazon card" -> { "intent": "GIFTCARD" }
+                Example: "Pay 5k for light" -> { "intent": "PAY_BILL", "entities": { "amount": 5000, "billType": "Electricity" } }
             `;
 
             const response = await openai.chat.completions.create({
