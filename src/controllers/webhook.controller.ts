@@ -166,7 +166,7 @@ export class WebhookController {
 
         const isMenu = rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText === 'HOME' || rawText.toLowerCase() === 'home';
         const isHi = rawText.toLowerCase().includes('hi') || rawText.toLowerCase().includes('hello');
-        
+
         if (rawText === 'BACK' && context.previousState) {
             await prisma.session.update({ 
                 where: { id: session.id }, 
@@ -174,6 +174,18 @@ export class WebhookController {
             });
             // Re-trigger logic with empty text to refresh the previous state's prompt
             return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'REFRESH');
+        }
+
+        if (rawText === 'START_ONBOARDING' || rawText === 'OPEN_ACCOUNT') {
+            const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*\n\n⚠️ *Note*: Use the exact name on your **BVN or ID Card** to avoid bank verification errors.`;
+            await sendAndLog(welcomeMsg, 'SIGNUP_START');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
+            return;
+        }
+
+        if (rawText === 'HELP_MENU') {
+            await sendAndLog(`ChatPay is an autonomous banking engine. You can:\n• 💰 Check Balances\n• 🏦 Fund Wallets\n• 💸 Send Money\n• 💡 Pay Bills\n• 💳 Get Virtual Cards\n\nType "Menu" to see all options!`, 'HELP_INFO');
+            return;
         }
 
         if (isMenu || (isHi && session.currentState === 'START')) {
@@ -224,29 +236,12 @@ export class WebhookController {
             if (rawText !== 'REFRESH') {
                 await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
             }
-            const typeMenu = [
-                { id: "TYPE_INDIVIDUAL", title: "👤 Individual" },
-                { id: "TYPE_BUSINESS", title: "💼 Business" },
-                { id: "HOME", title: "🏠 Home" }
-            ];
-            await whapiService.sendButtons(phoneNumber, `Thanks ${user.name || 'there'}! 🤝 Is this account for yourself or a business?`, typeMenu, "Tap an option to proceed.");
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE', context: JSON.stringify({ ...context, lastMenuOptions: typeMenu, previousState: 'AWAITING_NAME' }) } });
+            await sendAndLog(`Great! Kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, previousState: 'AWAITING_NAME' }) } });
             return;
         }
 
-        if (session.currentState === 'AWAITING_TYPE' || (rawText.startsWith('TYPE_') || rawText === 'REFRESH' && session.currentState === 'AWAITING_TYPE')) {
-            const choice = rawText.replace('TYPE_', '').toLowerCase();
-            if (choice.includes('personal') || choice.includes('individual') || choice === '1' || choice === 'individual') {
-                await sendAndLog(`Great! Kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'AWAITING_TYPE' }) } });
-            } else if (choice.includes('business') || choice.includes('company') || choice === '2' || choice === 'business') {
-                await sendAndLog(`Understood. Please provide your *Registered Business Name*:`, 'SIGNUP_BUSINESS_NAME');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business', previousState: 'AWAITING_TYPE' }) } });
-            } else if (rawText !== 'REFRESH') {
-                await sendAndLog(`Please choose Individual or Business from the menu.`, 'SIGNUP_TYPE_RETRY');
-            }
-            return;
-        }
+
 
         if (session.currentState === 'AWAITING_BUSINESS_NAME' || rawText === 'REFRESH' && session.currentState === 'AWAITING_BUSINESS_NAME') {
             await sendAndLog(`Got it. Now, please provide your *CAC Number* (RC Number) for verification:`, 'SIGNUP_CAC');
@@ -258,34 +253,30 @@ export class WebhookController {
         }
 
         if (session.currentState === 'AWAITING_KYC') {
-            const isBusiness = context.type === 'business';
-            
-            await sendAndLog(`Verifying your ${isBusiness ? 'business' : 'identity'} details... ⏳`, 'KYC_FLOW');
-            
-            const isVerified = rawText.length >= 8; // Basic length validation
-            if (isVerified) {
+            const cleanBvn = rawText.replace(/\D/g, '');
+            if (cleanBvn.length === 11) {
+                await sendAndLog(`Verifying your 11-digit BVN vault details... ⏳`, 'KYC_FLOW');
+                
                 await prisma.user.update({ 
                     where: { id: user.id }, 
                     data: { 
                         kycStatus: 'VERIFIED',
-                        ...(isBusiness ? {} : { bvn: rawText.replace(/\D/g, '') }) 
+                        bvn: cleanBvn
                     } 
                 });
                 
-                await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please long-press and delete your previous message containing your BVN to protect yourself from unauthorized access to your device.`, 'KYC_SECURITY_NOTICE');
-                await sendAndLog(`Verified! ✅ Finalizing your ${isBusiness ? 'Business' : 'Individual'} wallet setup...`, 'KYC_VERIFIED');
+                await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please **long-press and delete** your previous message containing your BVN to protect yourself from unauthorized access to your device.`, 'KYC_SECURITY_NOTICE');
+                await sendAndLog(`Verified! ✅ Finalizing your individual wallet setup with Fincra... 🏦`, 'KYC_VERIFIED');
                 try {
-                    const wallet = await WalletService.setupUserWallet(user.id, isBusiness ? 'business' : 'individual', context.businessName);
-                    
-                    const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Type*: ${isBusiness ? '💼 Business' : '👤 Individual'}\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${isBusiness ? context.businessName : user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
-                    
+                    const wallet = await WalletService.setupUserWallet(user.id, 'individual');
+                    const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
                     await sendAndLog(bankDetails, 'WALLET_CREATED');
-                } catch (e) {
+                } catch (e: any) {
                     await sendAndLog(`Verification complete! ✅ We're finalizing your virtual account now. Type "Balance" in a moment to see your details.`, 'WALLET_PENDING');
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else {
-                await sendAndLog(`Invalid ${isBusiness ? 'CAC Number' : 'BVN'}. ❌ Please enter valid credentials to secure your wallet.`, 'KYC_INVALID');
+                await sendAndLog(`Invalid BVN. ❌ Your BVN must be exactly 11 digits. Please enter it again correctly to secure your wallet:`, 'KYC_INVALID');
             }
             return;
         }
