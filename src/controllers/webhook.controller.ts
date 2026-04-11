@@ -133,6 +133,17 @@ export class WebhookController {
                 await whapiService.sendMessage(phoneNumber, welcomeMsg);
             }
             
+            // Log outbound for visibility
+            await prisma.conversationLog.create({
+                data: {
+                    userId: user.id,
+                    direction: 'OUTBOUND',
+                    message: welcomeMsg,
+                    intent: 'GREETING',
+                    aiResponse: welcomeMsg
+                }
+            });
+
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
             return;
         }
