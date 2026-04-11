@@ -236,10 +236,30 @@ export class WebhookController {
             if (rawText !== 'REFRESH') {
                 await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
             }
-            await sendAndLog(`Great! Kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, previousState: 'AWAITING_NAME' }) } });
+            const typeMenu = [
+                { id: "TYPE_INDIVIDUAL", title: "👤 Individual", description: "Personal banking & savings" },
+                { id: "TYPE_BUSINESS", title: "💼 Business", description: "For registered companies/entities" },
+                { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
+            ];
+            await whapiService.sendList(phoneNumber, `Thanks ${rawText !== 'REFRESH' ? rawText : (user.name || 'there')}! 🤝 Is this account for yourself (Personal) or a Business?`, "Select Account Type", typeMenu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE', context: JSON.stringify({ ...context, lastMenuOptions: typeMenu, previousState: 'AWAITING_NAME' }) } });
             return;
         }
+
+        if (session.currentState === 'AWAITING_TYPE' || (rawText.startsWith('TYPE_') || rawText === 'REFRESH' && session.currentState === 'AWAITING_TYPE')) {
+            const choice = rawText.replace('TYPE_', '').toLowerCase();
+            if (choice.includes('personal') || choice.includes('individual') || choice === '1' || choice === 'individual') {
+                await sendAndLog(`Great! Kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'AWAITING_TYPE' }) } });
+            } else if (choice.includes('business') || choice.includes('company') || choice === '2' || choice === 'business') {
+                await sendAndLog(`Understood. Please provide your *Registered Business Name*:`, 'SIGNUP_BUSINESS_NAME');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business', previousState: 'AWAITING_TYPE' }) } });
+            } else if (rawText !== 'REFRESH') {
+                await sendAndLog(`Please choose Individual or Business from the menu.`, 'SIGNUP_TYPE_RETRY');
+            }
+            return;
+        }
+
 
 
 
