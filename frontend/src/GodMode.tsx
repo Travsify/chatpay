@@ -1100,8 +1100,11 @@ const ApiVault = ({ api }: { api: any }) => {
     try {
       await api('/api/admin/config', { method: 'POST', data: config });
       setMessage({ text: 'API Vault successfully synced to database', isError: false });
-    } catch (error) {
-      setMessage({ text: 'Failed to save configuration', isError: true });
+      alert('Success: Configuration saved!');
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error || 'Failed to save configuration';
+      setMessage({ text: errorMsg, isError: true });
+      alert('Error: ' + errorMsg);
     } finally {
       setSaving(false);
     }
