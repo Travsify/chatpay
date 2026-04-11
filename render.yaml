@@ -8,7 +8,7 @@ services:
     startCommand: node dist/index.js
     envVars:
       - key: NODE_VERSION
-        value: 18.16.0
+        value: 20.x
       - key: PORT
         value: 10000
       - fromGroup: chatpay-secrets
@@ -21,5 +21,7 @@ services:
     buildCommand: cd frontend && npm install && npm run build
     publishPath: ./frontend/dist
     envVars:
+      - key: NODE_VERSION
+        value: 20.x
       - key: VITE_API_URL
         value: https://chatpay-l4ej.onrender.com
