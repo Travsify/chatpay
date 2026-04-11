@@ -143,6 +143,17 @@ export class WebhookController {
             return;
         }
 
+        const context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
+        
+        if (rawText === 'BACK' && context.previousState) {
+            await prisma.session.update({ 
+                where: { id: session.id }, 
+                data: { currentState: context.previousState, context: JSON.stringify({ ...context, previousState: null }) } 
+            });
+            // Re-trigger logic with empty text to refresh the previous state's prompt
+            return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'REFRESH');
+        }
+
         if (isMenu || (isHi && session.currentState === 'START')) {
             if (!user.name || user.kycStatus !== 'VERIFIED') {
                 const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion. I don't just manage your money; I help you conquer the global financial landscape right here on WhatsApp.\n\n*Here is what I can do for you right now:*\n🌍 *Multi-Currency Accounts*: Get instant NGN/USD/EUR/GBP banking details.\n💸 *High-Speed Transfers*: Move funds to any Nigerian bank in seconds.\n💡 *Smart Bills*: One-tap payments for Airtime, Data, and Power.\n💳 *USD Virtual Cards*: Shop globally with our Master/Visa cards.\n₿ *Crypto Transactions*: Buy/Sell BTC & USDT at the best market rates.\n🎁 *Asset Trading*: Trade your Gift Cards for instant cash.\n\n*To activate your secure global vault and experience the future of banking, what is your Full Name?*`;
@@ -174,33 +185,38 @@ export class WebhookController {
         }
 
         // 1. Check Ongoing Flow States
-        if (session.currentState === 'AWAITING_NAME') {
-            await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
-            await sendAndLog(`Thanks ${rawText}! 🤝 Is this account for yourself or a business?\n\n1. *Individual* (Personal usage)\n2. *Business* (Company usage)`, 'SIGNUP_TYPE');
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE' } });
+        if (session.currentState === 'AWAITING_NAME' || rawText === 'REFRESH' && session.currentState === 'AWAITING_NAME') {
+            if (rawText !== 'REFRESH') {
+                await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
+            }
+            await whapiService.sendList(phoneNumber, `Thanks ${user.name || 'there'}! 🤝 Is this account for yourself or a business?`, "Select Type", [
+                { id: "TYPE_INDIVIDUAL", title: "👤 Individual", description: "For personal usage" },
+                { id: "TYPE_BUSINESS", title: "💼 Business", description: "For company usage" },
+                { id: "HOME", title: "🔙 Home", description: "Restart" }
+            ]);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE', context: JSON.stringify({ ...context, previousState: 'AWAITING_NAME' }) } });
             return;
         }
 
-        if (session.currentState === 'AWAITING_TYPE') {
-            const choice = rawText.toLowerCase();
-            if (choice.includes('personal') || choice.includes('individual') || choice === '1') {
+        if (session.currentState === 'AWAITING_TYPE' || (rawText.startsWith('TYPE_') || rawText === 'REFRESH' && session.currentState === 'AWAITING_TYPE')) {
+            const choice = rawText.replace('TYPE_', '').toLowerCase();
+            if (choice.includes('personal') || choice.includes('individual') || choice === '1' || choice === 'individual') {
                 await sendAndLog(`Great! Kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ type: 'individual' }) } });
-            } else if (choice.includes('business') || choice.includes('company') || choice === '2') {
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'AWAITING_TYPE' }) } });
+            } else if (choice.includes('business') || choice.includes('company') || choice === '2' || choice === 'business') {
                 await sendAndLog(`Understood. Please provide your *Registered Business Name*:`, 'SIGNUP_BUSINESS_NAME');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ type: 'business' }) } });
-            } else {
-                await sendAndLog(`Please choose 1 for Individual or 2 for Business.`, 'SIGNUP_TYPE_RETRY');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business', previousState: 'AWAITING_TYPE' }) } });
+            } else if (rawText !== 'REFRESH') {
+                await sendAndLog(`Please choose Individual or Business from the menu.`, 'SIGNUP_TYPE_RETRY');
             }
             return;
         }
 
-        if (session.currentState === 'AWAITING_BUSINESS_NAME') {
-            const context = JSON.parse(String(session.context || '{}'));
+        if (session.currentState === 'AWAITING_BUSINESS_NAME' || rawText === 'REFRESH' && session.currentState === 'AWAITING_BUSINESS_NAME') {
             await sendAndLog(`Got it. Now, please provide your *CAC Number* (RC Number) for verification:`, 'SIGNUP_CAC');
             await prisma.session.update({ where: { id: session.id }, data: { 
                 currentState: 'AWAITING_KYC', 
-                context: JSON.stringify({ ...context, businessName: rawText }) 
+                context: JSON.stringify({ ...context, businessName: rawText, previousState: 'AWAITING_BUSINESS_NAME' }) 
             } });
             return;
         }
@@ -249,7 +265,7 @@ export class WebhookController {
                     await sendAndLog(`Please enter your *4-digit PIN* to authorize this transaction:`, 'PIN_VERIFY_REQUEST');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
                 }
-            } else {
+            } else if (rawText === 'BACK' || rawText.toLowerCase().includes('no')) {
                 await sendAndLog(`Transaction cancelled. ❌`, 'TRANSFER_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             }
@@ -317,57 +333,72 @@ export class WebhookController {
         }
 
         // ===== MENU BUTTON HANDLERS =====
-        if (rawText === 'FUND_WALLET') {
+        if (rawText === 'FUND_WALLET' || rawText === 'REFRESH' && session.currentState === 'FUND_WALLET') {
             const fundTxt = `🏦 *Fund Your Wallet*\n\nSelect the currency you'd like to fund:`;
             await whapiService.sendList(phoneNumber, fundTxt, "Select Currency", [
                 { id: "FUND_NGN", title: "🇳🇬 Fund NGN", description: "Get your local bank details" },
                 { id: "FUND_USD", title: "🇺🇸 Fund USD", description: "Get your US banking details" },
                 { id: "FUND_GBP", title: "🇬🇧 Fund GBP", description: "Get your UK banking details" },
-                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+                { id: "HOME", title: "🔙 Home", description: "Main menu" }
             ]);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'FUND_WALLET', context: JSON.stringify({ ...context, previousState: 'START' }) }});
             return;
         }
 
         if (rawText === 'FUND_NGN') {
             const balance = await WalletService.getBalance(user.id);
             const msg = `🇳🇬 *Your NGN Bank Details*\n\n*Bank*: WEMA BANK\n*Account Number*: ${user.fincraWalletId || 'PENDING'}\n*Account Name*: ${user.name}\n\nBalance: ₦${balance.toLocaleString()}\n\n_Transfer funds to this account to top up instantly._`;
-            await sendAndLog(msg, 'FUNDING_DETAILS');
+            await whapiService.sendList(phoneNumber, msg, "Options", [
+                { id: "CHECK_BALANCE", title: "💰 Refresh Balance", description: "See current funds" },
+                { id: "HOME", title: "🏠 Home", description: "Main menu" }
+            ]);
             return;
         }
 
-        if (rawText === 'CARD_MENU') {
+        if (rawText === 'CARD_MENU' || rawText === 'REFRESH' && session.currentState === 'CARD_MENU') {
             const cardTxt = `💳 *Virtual Cards*\n\nManage your global shopping cards:`;
             await whapiService.sendList(phoneNumber, cardTxt, "Card Services", [
                 { id: "CREATE_CARD", title: "✨ Create New Card", description: "Generate a USD Master/Visa card" },
                 { id: "MY_CARDS", title: "📂 View My Cards", description: "See active cards & balances" },
                 { id: "TOPUP_CARD", title: "💰 Top Up Card", description: "Add funds to your virtual card" },
-                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+                { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
+                { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'CARD_MENU', context: JSON.stringify({ ...context, previousState: 'START' }) }});
             return;
         }
 
-        if (rawText === 'ASSET_TRADING') {
+        if (rawText === 'ASSET_TRADING' || rawText === 'REFRESH' && session.currentState === 'ASSET_TRADING') {
             const assetTxt = `₿ *Asset Trading Desk*\n\nSelect a market to trade in:`;
             await whapiService.sendList(phoneNumber, assetTxt, "Trading Markets", [
                 { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
                 { id: "GIFTCARD", title: "🎁 Sell Giftcards", description: "Trade giftcards for cash" },
-                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+                { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
+                { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'ASSET_TRADING', context: JSON.stringify({ ...context, previousState: 'START' }) }});
             return;
         }
 
-        if (rawText === 'GLOBAL_ACCOUNTS') {
+        if (rawText === 'GLOBAL_ACCOUNTS' || rawText === 'REFRESH' && session.currentState === 'GLOBAL_ACCOUNTS') {
             const globalTxt = `🌍 *Global Wallets*\n\nExpand your financial reach:`;
             await whapiService.sendList(phoneNumber, globalTxt, "Global Services", [
                 { id: "OPEN_ACCOUNT_USD", title: "🇺🇸 Open USD Account", description: "Get US Banking details" },
                 { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Open GBP Account", description: "Get UK Banking details" },
-                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+                { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
+                { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'GLOBAL_ACCOUNTS', context: JSON.stringify({ ...context, previousState: 'START' }) }});
             return;
         }
 
         if (rawText === 'SEND_MONEY_FLOW') {
-            await sendAndLog(`Okay! 💸 Who are we sending money to? \n\nI can send money to any **Nigerian Bank Account** or another **ChatPay User** instantly.\n\nPlease reply with their *10-digit Account Number* (or ChatPay Phone Number) and the amount.\n\nExample: "Send 5000 to 08012345678" or "Transfer 10k to 2038475647"`, 'TRANSFER_PROMPT');
+            await whapiService.sendList(phoneNumber, `Okay! 💸 Who are we sending money to? \n\nI can send money to any **Nigerian Bank Account** or another **ChatPay User** instantly.\n\nPlease reply with their *10-digit Account Number* (or ChatPay Phone Number) and the amount.\n\nExample: "Send 5000 to 08012345678"`, "Transfer Mode", [
+                { id: "BANK_TRANSFER", title: "🏦 External Bank", description: "Any Nigerian bank" },
+                { id: "P2P_TRANSFER", title: "📱 Internal User", description: "ChatPay to ChatPay" },
+                { id: "HOME", title: "🏠 Home", description: "Main menu" }
+            ]);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'SEND_MONEY_FLOW', context: JSON.stringify({ ...context, previousState: 'START' }) }});
             return;
         }
 
