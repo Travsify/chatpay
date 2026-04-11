@@ -159,7 +159,7 @@ export class WhapiService {
         const numericTo = to.replace(/\D/g, '');
         const payload = {
             to: numericTo,
-            body: text,
+            body: { text: text },
             typing_time: 0,
             action: {
                 buttons: buttons.map(b => ({
@@ -189,7 +189,7 @@ export class WhapiService {
         const numericTo = to.replace(/\D/g, '');
         const payload = {
             to: numericTo,
-            body: text,
+            body: { text: text },
             typing_time: 0,
             action: {
                 button,
