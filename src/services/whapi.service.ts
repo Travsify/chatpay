@@ -190,7 +190,7 @@ export class WhapiService {
                     type: 'list',
                     body: { text: text },
                     action: {
-                        action: 'list', // Required by some Whapi versions
+                        name: 'list', 
                         button: buttonText.replace(/[^\w\s]/gi, '').trim().slice(0, 20),
                         sections: [{
                             title: "Select Service",
@@ -239,7 +239,7 @@ export class WhapiService {
                     body: { text: text },
                     footer: footer ? { text: footer } : undefined,
                     action: {
-                        action: 'buttons',
+                        name: 'buttons',
                         buttons: buttons.map(b => ({
                             type: 'reply',
                             reply: { id: b.id, title: b.title.replace(/[^\w\s]/gi, '').trim().slice(0, 20) }

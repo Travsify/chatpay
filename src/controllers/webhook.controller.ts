@@ -130,6 +130,16 @@ export class WebhookController {
             await WebhookController.logWebhook('OUTBOUND', phoneNumber, JSON.stringify({ body: message }), 'PROCESSED');
         };
 
+        // ===== GLOBAL PRIORITY: START AFRESH (Before Mapping) =====
+        if (rawText.toLowerCase() === 'reset' || rawText === 'RESTART_FLOW' || rawText === 'START_OVER') {
+            await prisma.session.deleteMany({ where: { userId: user.id } });
+            await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING', fincraWalletId: null, fincraCustomerId: null } });
+            
+            const restartMsg = "✨ *ChatPay Onboarding Restarted:* All previous steps cleared. Please provide your **Full Legal Name** as it appears on your ID/BVN to begin again:";
+            await whapiService.sendMessage(phoneNumber, restartMsg);
+            return;
+        }
+
         // ===== UX: NUMBER-BASED MENU SELECTION =====
         if (/^\d+$/.test(rawText) && context.lastMenuOptions) {
             const index = parseInt(rawText) - 1;
@@ -140,9 +150,10 @@ export class WebhookController {
             }
         }
 
+
         // ===== SECURITY: KYC GATEWAY =====
         const bankingCommands = ['CHECK_BALANCE', 'FUND_WALLET', 'SEND_MONEY', 'PAY_BILLS', 'CARD_MENU', 'ASSET_TRADING', 'GLOBAL_ACCOUNTS', 'GLOBAL_WALLETS'];
-        if (bankingCommands.includes(rawText) && user.kycStatus !== 'VERIFIED') {
+        if (bankingCommands.includes(rawText) && (user.kycStatus !== 'VERIFIED' || !user.fincraWalletId)) {
             await sendAndLog(`🔐 *Security Guard:* You must complete your account activation before accessing banking features.`, 'KYC_REQUIRED');
             return WebhookController.processLogic(user, session, aiResult, 'MENU');
         }
@@ -156,18 +167,6 @@ export class WebhookController {
         const isMenu = rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText === 'HOME' || rawText.toLowerCase() === 'home';
         const isHi = rawText.toLowerCase().includes('hi') || rawText.toLowerCase().includes('hello');
         
-        if (rawText.toLowerCase() === 'reset' || rawText === 'RESTART_FLOW') {
-            await prisma.session.deleteMany({ where: { userId: user.id } });
-            
-            if (user.kycStatus === 'VERIFIED') {
-                await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Home:* Your session has been reset. You've brought back to the main menu. Say 'Hi' to continue.");
-            } else {
-                await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING' } });
-                await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Onboarding Restarted:* All previous steps cleared. Please provide your **Full Legal Name** as it appears on your ID/BVN to begin again:");
-            }
-            return;
-        }
-
         if (rawText === 'BACK' && context.previousState) {
             await prisma.session.update({ 
                 where: { id: session.id }, 
@@ -178,11 +177,11 @@ export class WebhookController {
         }
 
         if (isMenu || (isHi && session.currentState === 'START')) {
-            const isVerified = user.kycStatus === 'VERIFIED';
+            const isVerified = user.kycStatus === 'VERIFIED' && user.fincraWalletId;
             
             // Onboarding Users (New or Reset)
             if (!isVerified) {
-                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*`;
+                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*\n\n⚠️ *Note*: Use the exact name on your **BVN or ID Card** to avoid bank verification errors.`;
                 const welcomeMenu = [
                     { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
                     { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
