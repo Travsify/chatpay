@@ -33,16 +33,12 @@ export class AdminController {
     static async updateSystemConfig(req: AuthRequest, res: Response) {
         try {
             const data = req.body;
-            // Only update fields that exist
+            const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'quidaxSecret', 'prestmitSecret'];
             const updateData: any = {};
-            if (data.whatsappNumber !== undefined) updateData.whatsappNumber = data.whatsappNumber;
-            if (data.premblySecret !== undefined) updateData.premblySecret = data.premblySecret;
-            if (data.openaiKey !== undefined) updateData.openaiKey = data.openaiKey;
-            if (data.fincraSecret !== undefined) updateData.fincraSecret = data.fincraSecret;
-            if (data.flutterwaveSecret !== undefined) updateData.flutterwaveSecret = data.flutterwaveSecret;
-            if (data.whapiToken !== undefined) updateData.whapiToken = data.whapiToken;
-            if (data.quidaxSecret !== undefined) updateData.quidaxSecret = data.quidaxSecret;
-            if (data.prestmitSecret !== undefined) updateData.prestmitSecret = data.prestmitSecret;
+            
+            allowedFields.forEach(field => {
+                if (data[field] !== undefined) updateData[field] = data[field];
+            });
 
             const config = await prisma.systemConfig.upsert({
                 where: { id: 'global' },
@@ -51,9 +47,9 @@ export class AdminController {
             });
 
             res.json({ message: 'System configuration updated successfully', config });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Config Update Error:', error);
-            res.status(500).json({ error: 'Failed to update system configuration' });
+            res.status(500).json({ error: error.message || 'Failed to update system configuration' });
         }
     }
 
