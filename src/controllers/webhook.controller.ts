@@ -60,6 +60,8 @@ export class WebhookController {
                     }
                 } else if (msg.type === 'call_log' || msg.type === 'system') {
                     rawText = 'SYSTEM_CALL_REJECTED';
+                } else if (msg.type === 'interactive' || msg.interactive || msg.button_reply || msg.list_reply) {
+                    rawText = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button_reply?.id || msg.list_reply?.id || '';
                 } else {
                     rawText = msg.text?.body || '';
                 }
