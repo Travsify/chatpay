@@ -33,11 +33,14 @@ export class AdminController {
     static async updateSystemConfig(req: AuthRequest, res: Response) {
         try {
             const data = req.body;
-            const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'quidaxSecret', 'prestmitSecret'];
+            const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'whapiApiUrl', 'quidaxSecret', 'prestmitSecret'];
             const updateData: any = {};
             
             allowedFields.forEach(field => {
-                if (data[field] !== undefined) updateData[field] = data[field];
+                if (req.body[field] !== undefined) {
+                    const value = req.body[field];
+                    updateData[field] = (typeof value === 'string') ? value.trim() : value;
+                }
             });
 
             const config = await prisma.systemConfig.upsert({

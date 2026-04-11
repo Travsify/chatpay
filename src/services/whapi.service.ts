@@ -10,24 +10,47 @@ export class WhapiService {
         this.token = process.env.WHAPI_TOKEN || '';
     }
 
-    private async getToken() {
-        // PRIORITY 0: Direct Environment Override (Persistent on Render)
-        if (process.env.WHAPI_TOKEN && process.env.WHAPI_TOKEN !== '' && process.env.WHAPI_TOKEN !== 'your_whapi_token_here') {
-            return process.env.WHAPI_TOKEN;
-        }
-
-        // PRIORITY 1: Check Database (God Mode Vault)
+    private async getUrl() {
         try {
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-            if (config?.whapiToken && config.whapiToken !== '') {
-                return config.whapiToken;
+            if (config?.whapiApiUrl && config.whapiApiUrl.trim() !== '') {
+                // Aggressive ASCII-only filter
+                let url = config.whapiApiUrl.trim().replace(/[^\x20-\x7E]/g, '');
+                return url.endsWith('/') ? url.slice(0, -1) : url;
+            }
+        } catch (e) {
+            console.error('[Whapi] Failed to fetch URL from DB');
+        }
+        return process.env.WHAPI_API_URL || 'https://gate.whapi.cloud';
+    }
+
+    private async getToken() {
+        let rawToken = '';
+        
+        // PRIORITY 0: Check Database (God Mode Vault)
+        try {
+            const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            if (config?.whapiToken && config.whapiToken.trim() !== '') {
+                rawToken = config.whapiToken.trim();
             }
         } catch (e) {
             console.error('[Whapi] Failed to fetch token from DB');
         }
 
-        // PRIORITY 2: Emergency Hardcoded Fallback (for immediate activation)
-        return 'eoR2mA57NDEn40E6OrfrD6y5PcajTBjx';
+        // PRIORITY 1: Direct Environment Override
+        if (!rawToken && process.env.WHAPI_TOKEN && process.env.WHAPI_TOKEN !== '' && process.env.WHAPI_TOKEN !== 'your_whapi_token_here') {
+            rawToken = process.env.WHAPI_TOKEN.trim();
+        }
+
+        // PRIORITY 2: Emergency Hardcoded Fallback
+        if (!rawToken) {
+            rawToken = 'eoR2mA57NDEn40E6OrfrD6y5PcajTBjx';
+        }
+
+        // FINAL SANITIZATION: DEFINITIVE FIX - Aggressive ASCII filter + Latin1 Buffer encoding
+        // This removes ALL non-header-safe characters including newlines, tabs, and hidden Unicode.
+        const clean = rawToken.replace(/[^\x20-\x7E]/g, '').trim();
+        return Buffer.from(clean, 'utf-8').toString('latin1');
     }
 
     async sendMessage(to: string, body: string) {
@@ -41,7 +64,8 @@ export class WhapiService {
             return { sent: true, mock: true };
         }
         try {
-            const response = await axios.post(`${this.apiUrl}/messages/text`, {
+            const apiUrl = await this.getUrl();
+            const response = await axios.post(`${apiUrl}/messages/text`, {
                 typing_time: 0,
                 to: cleanTo,
                 body: body
@@ -62,7 +86,8 @@ export class WhapiService {
     async sendImage(to: string, mediaUrl: string, caption?: string) {
         const token = await this.getToken();
         try {
-            const response = await axios.post(`${this.apiUrl}/messages/image`, {
+            const apiUrl = await this.getUrl();
+            const response = await axios.post(`${apiUrl}/messages/image`, {
                 to: to,
                 media: mediaUrl,
                 caption: caption
@@ -81,8 +106,15 @@ export class WhapiService {
 
     async registerWebhook(webhookUrl: string) {
         const token = await this.getToken();
+        
+        // Debug logging (masking middle for security)
+        const maskedToken = token ? `${token.substring(0, 6)}...${token.substring(token.length - 4)}` : 'NONE';
+        console.log(`[Whapi] Attempting to sync webhook to ${webhookUrl} using token: ${maskedToken}`);
+
         try {
-            const response = await axios.patch(`${this.apiUrl}/settings`, {
+            const apiUrl = await this.getUrl();
+            // Updated structure to match standard Whapi.cloud settings payload
+            const response = await axios.patch(`${apiUrl}/settings`, {
                 webhooks: [
                     {
                         url: webhookUrl,
@@ -99,20 +131,24 @@ export class WhapiService {
                     'Content-Type': 'application/json'
                 }
             });
+            console.log('[Whapi] Sync success:', response.status);
             return response.data;
         } catch (error: any) {
-            console.error('Error registering Whapi webhook:', error.response?.data || error.message);
+            const errorData = error.response?.data || error.message;
+            console.error('[Whapi] Sync failure details:', JSON.stringify(errorData));
             throw error;
         }
     }
     async getChannelHealth() {
         const token = await this.getToken();
+        const apiUrl = await this.getUrl();
         try {
-            const response = await axios.get(`${this.apiUrl}/health`, {
+            const response = await axios.get(`${apiUrl}/health`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             return response.data;
         } catch (error: any) {
+             console.error('[Whapi] Health Check Failed:', error.response?.data?.message || error.message);
              return { status: 'ERROR', error: error.response?.data || error.message };
         }
     }

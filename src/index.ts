@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import bodyParser from 'body-parser';
-import dotenv from 'dotenv';
 import path from 'path';
 import cors from 'cors';
 import { WebhookController } from './controllers/webhook.controller.js';
@@ -8,8 +10,6 @@ import { AdminController } from './controllers/admin.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
 import { authMiddleware, requireRole } from './middleware/auth.middleware.js';
 import prisma from './utils/prisma.js';
-
-dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -23,12 +23,12 @@ app.use(bodyParser.json());
 app.get('/api/status', (req, res) => {
     res.json({ 
         message: 'ChatPay API — Operational',
-        version: '3.0.0',
+        version: '3.1.0',
         timestamp: new Date().toISOString()
     });
 });
 
-// Front-end Public API Config
+// Load configuration
 app.get('/api/config/public', async (req, res) => {
     try {
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
@@ -86,8 +86,8 @@ app.use((req, res) => {
 });
 
 app.listen(PORT as number, '0.0.0.0', () => {
-    console.log(`\n🏦 ChatPay Server v3.0 — God Mode Active`);
-    console.log(`   Port: ${PORT}`);
+    console.log(`\n🏦 ChatPay Server v3.1 (ASCII-FIX) — God Mode Active        
+   Port: ${PORT}`);
     console.log(`   Admin: /api/auth/setup (first-time)`);
     console.log(`   API:   /api/status\n`);
 });

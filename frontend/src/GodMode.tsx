@@ -1281,16 +1281,26 @@ const ApiVault = ({ api }: { api: any }) => {
         {/* Whapi */}
         <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
           <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
-            <MessageSquare size={14} className="text-[#25D366]" /> Whapi.cloud
+            <MessageSquare size={14} className="text-[#25D366]" /> Whapi.cloud Configuration
           </label>
-          <div className="relative">
-             <input
-               type={visibleKeys.whapiToken ? "text" : "password"} name="whapiToken" value={config.whapiToken || ''} onChange={handleChange}
-               className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Token"
-             />
-             <button type="button" onClick={() => toggleVisibility('whapiToken')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
-                {visibleKeys.whapiToken ? <EyeOff size={16} /> : <Eye size={16} />}
-             </button>
+          <div className="space-y-3">
+             <div>
+                <p className="text-[9px] text-[#8696a0] mb-1 italic">API Gateway URL (defaults to gate.whapi.cloud)</p>
+                <input
+                  type="text" name="whapiApiUrl" value={config.whapiApiUrl || ''} onChange={handleChange}
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="https://gate.whapi.cloud"
+                />
+             </div>
+             <div className="relative">
+                <p className="text-[9px] text-[#8696a0] mb-1 italic">Channel API Token</p>
+                <input
+                  type={visibleKeys.whapiToken ? "text" : "password"} name="whapiToken" value={config.whapiToken || ''} onChange={handleChange}
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Token"
+                />
+                <button type="button" onClick={() => toggleVisibility('whapiToken')} className="absolute right-3 top-9 text-[#8696a0] hover:text-white">
+                   {visibleKeys.whapiToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+             </div>
           </div>
         </div>
 

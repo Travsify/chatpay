@@ -111,6 +111,7 @@ model SystemConfig {
   fincraSecret      String?
   flutterwaveSecret String?
   whapiToken        String?
+  whapiApiUrl       String?
   quidaxSecret      String?
   prestmitSecret    String?
   updatedAt         DateTime @updatedAt
