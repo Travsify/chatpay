@@ -157,14 +157,15 @@ export class WebhookController {
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
             } else {
-                const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nManaging your finances has never been this easy. Please select an action from the menu below:`;
+                const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nHow can I help you manage your wealth today? Please select an option:`;
                 await whapiService.sendList(user.phoneNumber, menuTxt, "📱 Banking Menu", [
                     { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your current funds" },
-                    { id: "SEND_MONEY_FLOW", title: "💸 Send Money", description: "Transfer to any bank" },
-                    { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, Power" },
-                    { id: "CREATE_CARD", title: "💳 Virtual Cards", description: "USD Global Shopping Card" },
-                    { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
-                    { id: "OPEN_ACCOUNT_USD", title: "🌍 Open USD Account", description: "Get a US Bank Account" },
+                    { id: "FUND_WALLET", title: "🏦 Fund Wallet", description: "Get your account numbers" },
+                    { id: "SEND_MONEY_FLOW", title: "💸 Send Money", description: "Transfer to any bank or user" },
+                    { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, Power, TV" },
+                    { id: "CARD_MENU", title: "💳 Virtual Cards", description: "USD Master/Visa cards" },
+                    { id: "ASSET_TRADING", title: "₿ Asset Trading", description: "Buy/Sell Crypto & Giftcards" },
+                    { id: "GLOBAL_ACCOUNTS", title: "🌍 Global Wallets", description: "Open USD, GBP or EUR accounts" },
                     { id: "HOME", title: "🏠 Home", description: "Refresh this menu" }
                 ]);
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
@@ -315,13 +316,72 @@ export class WebhookController {
             return;
         }
 
-        // Map Button IDs to Intent logic
+        // ===== MENU BUTTON HANDLERS =====
+        if (rawText === 'FUND_WALLET') {
+            const fundTxt = `🏦 *Fund Your Wallet*\n\nSelect the currency you'd like to fund:`;
+            await whapiService.sendList(phoneNumber, fundTxt, "Select Currency", [
+                { id: "FUND_NGN", title: "🇳🇬 Fund NGN", description: "Get your local bank details" },
+                { id: "FUND_USD", title: "🇺🇸 Fund USD", description: "Get your US banking details" },
+                { id: "FUND_GBP", title: "🇬🇧 Fund GBP", description: "Get your UK banking details" },
+                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+            ]);
+            return;
+        }
+
+        if (rawText === 'FUND_NGN') {
+            const balance = await WalletService.getBalance(user.id);
+            const msg = `🇳🇬 *Your NGN Bank Details*\n\n*Bank*: WEMA BANK\n*Account Number*: ${user.fincraWalletId || 'PENDING'}\n*Account Name*: ${user.name}\n\nBalance: ₦${balance.toLocaleString()}\n\n_Transfer funds to this account to top up instantly._`;
+            await sendAndLog(msg, 'FUNDING_DETAILS');
+            return;
+        }
+
+        if (rawText === 'CARD_MENU') {
+            const cardTxt = `💳 *Virtual Cards*\n\nManage your global shopping cards:`;
+            await whapiService.sendList(phoneNumber, cardTxt, "Card Services", [
+                { id: "CREATE_CARD", title: "✨ Create New Card", description: "Generate a USD Master/Visa card" },
+                { id: "MY_CARDS", title: "📂 View My Cards", description: "See active cards & balances" },
+                { id: "TOPUP_CARD", title: "💰 Top Up Card", description: "Add funds to your virtual card" },
+                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+            ]);
+            return;
+        }
+
+        if (rawText === 'ASSET_TRADING') {
+            const assetTxt = `₿ *Asset Trading Desk*\n\nSelect a market to trade in:`;
+            await whapiService.sendList(phoneNumber, assetTxt, "Trading Markets", [
+                { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
+                { id: "GIFTCARD", title: "🎁 Sell Giftcards", description: "Trade giftcards for cash" },
+                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+            ]);
+            return;
+        }
+
+        if (rawText === 'GLOBAL_ACCOUNTS') {
+            const globalTxt = `🌍 *Global Wallets*\n\nExpand your financial reach:`;
+            await whapiService.sendList(phoneNumber, globalTxt, "Global Services", [
+                { id: "OPEN_ACCOUNT_USD", title: "🇺🇸 Open USD Account", description: "Get US Banking details" },
+                { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Open GBP Account", description: "Get UK Banking details" },
+                { id: "HOME", title: "🔙 Back", description: "Main menu" }
+            ]);
+            return;
+        }
+
         if (rawText === 'SEND_MONEY_FLOW') {
             await sendAndLog(`Okay! 💸 Who are we sending money to? \n\nI can send money to any **Nigerian Bank Account** or another **ChatPay User** instantly.\n\nPlease reply with their *10-digit Account Number* (or ChatPay Phone Number) and the amount.\n\nExample: "Send 5000 to 08012345678" or "Transfer 10k to 2038475647"`, 'TRANSFER_PROMPT');
             return;
         }
+
         if (rawText === 'OPEN_ACCOUNT_USD') {
             rawText = "Open a USD account"; // Force AI to process this
+        }
+
+        if (rawText === 'OPEN_ACCOUNT_GBP') {
+            rawText = "Open a GBP account"; // Force AI to process this
+        }
+
+        if (rawText === 'CRYPTO_TRADE') {
+            await sendAndLog(`Okay! ₿ Which asset would you like to buy? (e.g. "Buy $100 USDT")`, 'CRYPTO_PROMPT');
+            return;
         }
 
         // 2. Process Intent
