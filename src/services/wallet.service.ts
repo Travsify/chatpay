@@ -87,7 +87,7 @@ export class WalletService {
             
             let balance = 0;
             for (const tx of transactions) {
-                if (tx.type === 'DEPOSIT' || tx.type === 'P2P_RECEIVE') {
+                if (tx.type === 'FUNDING' || tx.type === 'P2P_RECEIVE') {
                     balance += tx.amount;
                 } else {
                     balance -= tx.amount;
