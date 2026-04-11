@@ -20,14 +20,21 @@ app.use(bodyParser.json());
 // ===== PUBLIC ROUTES =====
 
 // Health check JSON
-app.get('/api/status', (req, res) => {
+app.get('/api/status', async (req, res) => {
     const p = path.join(__dirname, '../frontend/dist');
+    let dbStatus = 'Unknown';
+    try {
+        await prisma.adminUser.count();
+        dbStatus = 'Connected';
+    } catch (e: any) {
+        dbStatus = 'Error: ' + e.message;
+    }
     res.json({ 
         message: 'ChatPay API — Operational',
-        version: '3.6.0',
+        version: '3.7.0',
         timestamp: new Date().toISOString(),
-        frontendPath: p,
-        frontendExists: fs.existsSync(p)
+        frontendExists: fs.existsSync(p),
+        database: dbStatus
     });
 });
 
