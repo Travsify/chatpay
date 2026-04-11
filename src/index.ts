@@ -31,7 +31,7 @@ app.get('/api/status', async (req, res) => {
     }
     res.json({ 
         message: 'ChatPay API — Operational',
-        version: '3.13.0',
+        version: '3.14.0',
         timestamp: new Date().toISOString(),
         frontendExists: fs.existsSync(p),
         database: dbStatus
