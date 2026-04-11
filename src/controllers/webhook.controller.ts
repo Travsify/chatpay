@@ -345,6 +345,22 @@ export class WebhookController {
                 if (user.kycStatus !== 'VERIFIED') {
                     await sendAndLog(`Please signup/verify first to check your balance.`, 'UNVERIFIED_ATTEMPT');
                 } else {
+                    // Auto-retry wallet creation if it failed during onboarding
+                    if (!user.fincraCustomerId) {
+                        await sendAndLog(`Setting up your wallet now... ⏳`, 'WALLET_RETRY');
+                        try {
+                            const wallet = await WalletService.setupUserWallet(user.id, 'individual');
+                            user = await prisma.user.findUnique({ where: { id: user.id } }) as any;
+                            const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
+                            await sendAndLog(bankDetails, 'WALLET_CREATED');
+                            break;
+                        } catch (e) {
+                            console.error('[Wallet] Auto-retry failed:', e);
+                            await sendAndLog(`We're having trouble connecting to the bank. Please try again in a moment.`, 'WALLET_RETRY_FAILED');
+                            break;
+                        }
+                    }
+
                     const balance = await WalletService.getBalance(user.id);
                     const isPending = user.fincraWalletId === 'PENDING' || !user.fincraWalletId;
 
