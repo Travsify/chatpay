@@ -57,7 +57,7 @@ export class WhapiService {
         const token = await this.getToken();
         const cleanTo = to.replace(/\D/g, ''); // Ensure no +, spaces, etc.
         
-        console.log(`[Whapi] Sending message to ${cleanTo} using token: ${token.substring(0, 5)}...`);
+        console.log(`[Whapi] Sending message to ${cleanTo}...`);
         
         if (!token || token === '' || token === 'your_whapi_token_here') {
             console.log(`[MOCK WHAPI] Sending to ${cleanTo}: ${body}`);
@@ -122,7 +122,7 @@ export class WhapiService {
                             { type: "messages", method: "post" },
                             { type: "statuses", method: "post" }
                         ],
-                        mode: "full"
+                        mode: "body"
                     }
                 ]
             }, {
@@ -179,7 +179,7 @@ export class WhapiService {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
         try {
-            const response = await axios.post(`${apiUrl}/messages/list`, {
+            const response = await axios.post(`${apiUrl}/messages/interactive`, {
                 to,
                 body: text,
                 button: buttonText,
