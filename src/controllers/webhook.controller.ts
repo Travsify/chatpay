@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import axios from 'axios';
 import { whapiService } from '../services/whapi.service.js';
 import { aiService } from '../services/ai.service.js';
 import { WalletService } from '../services/wallet.service.js';
