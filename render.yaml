@@ -4,7 +4,7 @@ services:
     name: chatpay-backend
     env: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && (cd frontend && npm install && npm run build) && npx tsc
     startCommand: node dist/index.js
     envVars:
       - key: NODE_VERSION
