@@ -17,11 +17,6 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// Health Check
-app.get('/', (req, res) => {
-    res.send('<h1>ChatPay Server is Live 🚀</h1><p>Status: Healthy | Database: Connected</p>');
-});
-
 // ===== PUBLIC ROUTES =====
 
 // Health check JSON
@@ -75,9 +70,11 @@ app.get('/api/admin/webhooks', authMiddleware, AdminController.getWebhookLogs);
 const frontendPath = path.join(process.cwd(), 'frontend', 'dist');
 if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath));
-    app.get('*', (req, res) => {
+    app.use((req, res, next) => {
         if (!req.path.startsWith('/api') && !req.path.startsWith('/webhook')) {
             res.sendFile(path.join(frontendPath, 'index.html'));
+        } else {
+            next();
         }
     });
 }
