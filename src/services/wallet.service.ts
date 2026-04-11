@@ -27,6 +27,7 @@ export class WalletService {
                 lastName: type === 'business' ? 'Enterprise' : lastName,
                 email: `${user.phoneNumber}@chatpay.io`,
                 accountType: type === 'business' ? 'corporate' : 'individual',
+                bvn: process.env.FINCRA_DEFAULT_BVN || '22222222222',
                 currency: currency,
                 businessName: type === 'business' ? businessName : undefined,
                 merchantReference: `chatpay-${user.id.slice(0, 8)}`
