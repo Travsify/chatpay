@@ -1284,12 +1284,21 @@ const ApiVault = ({ api }: { api: any }) => {
             <MessageSquare size={14} className="text-[#25D366]" /> Whapi.cloud Configuration
           </label>
           <div className="space-y-3">
-             <div>
-                <p className="text-[9px] text-[#8696a0] mb-1 italic">API Gateway URL (defaults to gate.whapi.cloud)</p>
-                <input
-                  type="text" name="whapiApiUrl" value={config.whapiApiUrl || ''} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="https://gate.whapi.cloud"
-                />
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">API Gateway URL</p>
+                   <input
+                     type="text" name="whapiApiUrl" value={config.whapiApiUrl || ''} onChange={handleChange}
+                     className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="https://gate.whapi.cloud"
+                   />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Webhook Destination URL</p>
+                   <input
+                     type="text" name="whapiWebhookUrl" value={config.whapiWebhookUrl || ''} onChange={handleChange}
+                     className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="https://chatpay-l4ej.onrender.com/webhook/whatsapp"
+                   />
+                </div>
              </div>
              <div className="relative">
                 <p className="text-[9px] text-[#8696a0] mb-1 italic">Channel API Token</p>

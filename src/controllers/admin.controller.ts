@@ -33,7 +33,7 @@ export class AdminController {
     static async updateSystemConfig(req: AuthRequest, res: Response) {
         try {
             const data = req.body;
-            const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'whapiApiUrl', 'quidaxSecret', 'prestmitSecret'];
+            const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'whapiApiUrl', 'whapiWebhookUrl', 'quidaxSecret', 'prestmitSecret'];
             const updateData: any = {};
             
             allowedFields.forEach(field => {
@@ -60,12 +60,12 @@ export class AdminController {
         try {
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
             
-            // PRIORITY: Database URL (from Vault) -> Environment -> Hardcoded Default
-            const webhookUrl = config?.whapiApiUrl || process.env.WHAPI_WEBHOOK_URL || 'https://chatpay-l4ej.onrender.com/webhook/whatsapp';
+            // PRIORITY: Database Webhook URL -> Environment -> Hardcoded Default
+            const webhookUrl = config?.whapiWebhookUrl || process.env.WHAPI_WEBHOOK_URL || 'https://chatpay-l4ej.onrender.com/webhook/whatsapp';
             
-            console.log(`[Admin] Synchronizing webhook to: ${webhookUrl}`);
+            console.log(`[Admin] TRIGGERING SYNC to: ${webhookUrl}`);
             const result = await whapiService.registerWebhook(webhookUrl);
-            res.json({ message: 'Webhook synchronized with Whapi.cloud', result });
+            res.json({ message: `Webhook synchronized to ${webhookUrl}`, result });
         } catch (error: any) {
             console.error('Webhook Sync Error:', error.response?.data || error.message);
             res.status(500).json({ error: error.response?.data?.message || 'Failed to sync webhook' });

@@ -36,8 +36,9 @@ export class AiService {
         if (!openai) {
             console.log(`[MOCK AI] No API key, using mock for: "${message}"`);
             const lower = message.toLowerCase();
-            if (lower.includes('sign') || lower.includes('hi')) return { intent: 'SIGNUP' };
-            if (lower.includes('send') || lower.includes('pay')) return { intent: 'SEND_FUNDS', entities: { amount: 2500, recipient: 'Peter' } };
+            const greetings = ['hi', 'hello', 'hey', 'yo', 'sup', 'morning', 'afternoon', 'evening', '👋'];
+            if (greetings.some(g => lower.includes(g))) return { intent: 'SIGNUP' };
+            if (lower.includes('send') || lower.includes('pay') || lower.includes('transfer')) return { intent: 'SEND_FUNDS', entities: { amount: 2500, recipient: 'Peter' } };
             return { intent: 'UNKNOWN' };
         }
         try {

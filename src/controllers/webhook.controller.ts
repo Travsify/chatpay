@@ -82,9 +82,9 @@ export class WebhookController {
             await WebhookController.logWebhook('OUTBOUND', phoneNumber, JSON.stringify({ body: message }), 'PROCESSED');
         };
 
-        // 0. New User Global Entry
-        if (!user.name && user.kycStatus === 'PENDING' && session.currentState === 'START' && aiResult.intent !== 'SIGNUP') {
-            const welcomeMsg = `✨ *Welcome to ChatPay!* ✨\n\nYour autonomous financial companion natively inside WhatsApp.\n\n*What I can do for you:*\n🏦 *Virtual Accounts*: Local & International bank details.\n🚀 *Transfers*: Swift payments to any Nigerian bank.\n💡 *Bills*: Airtime, Data, & Utility payments.\n₿ *Crypto & Cards*: Trade assets & gift cards instantly.\n\nTo get started with your secure wallet, please tell me your *Full Name*:`;
+        // 0. New User Global Entry & Proactive Greeting
+        if (!user.name && user.kycStatus === 'PENDING' && session.currentState === 'START') {
+            const welcomeMsg = `✨ *Welcome to ChatPay!* ✨\n\nYour autonomous financial companion natively inside WhatsApp.\n\n*What I can do for you:*\n🏦 *Virtual Accounts*: Nigerian bank details in seconds.\n🚀 *Transfers*: Swift payments to any bank.\n💡 *Bills*: Airtime & Utilities.\n₿ *Crypto*: Trade assets instantly.\n\nTo get started with your secure wallet, please tell me your *Full Name*:`;
             await sendAndLog(welcomeMsg, 'WELCOME_ONBOARDING');
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
             return;
@@ -107,26 +107,15 @@ export class WebhookController {
                 try {
                     const wallet = await WalletService.setupUserWallet(user.id);
                     
-                    // Log the virtual account creation
-                    if (wallet?.accountNumber) {
-                        await prisma.virtualAccount.create({
-                            data: {
-                                userId: user.id,
-                                accountNumber: wallet.accountNumber,
-                                bankName: 'WEMA BANK',
-                                currency: 'NGN',
-                                provider: 'FINCRA'
-                            }
-                        });
-                    }
-
-                    await sendAndLog(`Success! 🏦 Account: ${wallet?.accountNumber || 'Pending'}\nBank: Wema (ChatPay)`, 'WALLET_CREATED');
+                    const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
+                    
+                    await sendAndLog(bankDetails, 'WALLET_CREATED');
                 } catch (e) {
-                    await sendAndLog(`Verification complete! We'll notify you when your wallet is ready.`, 'WALLET_PENDING');
+                    await sendAndLog(`Verification complete! ✅ We're finalizing your virtual account now. Type "Balance" in a moment to see your details.`, 'WALLET_PENDING');
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
             } else {
-                await sendAndLog(`Invalid ID. Please enter a valid BVN/NIN.`, 'KYC_INVALID');
+                await sendAndLog(`Invalid ID. ❌ Please enter a valid BVN/NIN to secure your wallet.`, 'KYC_INVALID');
             }
             return;
         }
