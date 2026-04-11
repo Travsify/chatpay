@@ -159,49 +159,13 @@ export class WebhookController {
         if (session.currentState === 'AWAITING_TRANSFER_CONFIRM') {
             const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
             if (rawText.toLowerCase().includes('yes') || rawText.toLowerCase().includes('confirm')) {
-                const { amount, recipient } = context as any;
-                
-                // 1. Live Balance Check with Admin Fees
-                const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-                const flatFee = config?.flatFee || 0;
-                const percFee = (parseFloat(amount) * (config?.feePercentage || 0)) / 100;
-                const totalDebit = parseFloat(amount) + flatFee + percFee;
-
-                const balance = await WalletService.getBalance(user.id);
-                if (balance < totalDebit) {
-                    await sendAndLog(`Insufficient funds. ❌ Total required: ₦${totalDebit.toLocaleString()} (incl. ₦${flatFee + percFee} fee). Your balance is ₦${balance.toLocaleString()}.`, 'TRANSFER_INSUFFICIENT');
-                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
-                    return;
+                if (!user.transactionPin) {
+                    await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to secure your account and authorize payments:`, 'PIN_SETUP_START');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
+                } else {
+                    await sendAndLog(`Please enter your *4-digit PIN* to authorize this transaction:`, 'PIN_VERIFY_REQUEST');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
                 }
-
-                await sendAndLog(`Sending ₦${amount} to ${recipient}... 🚀`, 'TRANSFER_PROCESSING');
-
-                try {
-                    // 2. Real API Payout (Internal Transfer for Demo/Production)
-                    const reference = `CP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-                    
-                    // Logic to execute real payout to recipient goes here
-                    // Since it's a P2P transfer, we might just update the DB balances 
-                    // or use Fincra's internal transfer if they have a wallet.
-                    
-                    await prisma.transaction.create({
-                        data: {
-                            userId: user.id,
-                            type: 'P2P_SEND',
-                            amount: parseFloat(amount),
-                            currency: 'NGN',
-                            status: 'SUCCESS',
-                            reference,
-                            provider: 'FINCRA',
-                            description: `Transfer to ${recipient}`
-                        }
-                    });
-
-                    await sendAndLog(`Success! ✅ Transaction ref: ${reference}`, 'TRANSFER_SUCCESS');
-                } catch (e: any) {
-                    await sendAndLog(`Transfer failed: ${e.message}`, 'TRANSFER_FAILED');
-                }
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else {
                 await sendAndLog(`Transaction cancelled. ❌`, 'TRANSFER_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
@@ -209,45 +173,58 @@ export class WebhookController {
             return;
         }
 
+        if (session.currentState === 'AWAITING_PIN_SET') {
+            const pin = rawText.trim();
+            if (pin.length === 4 && /^\d+$/.test(pin)) {
+                await prisma.user.update({ where: { id: user.id }, data: { transactionPin: pin } });
+                await sendAndLog(`PIN set successfully! ✅ Now, please enter it once more to authorize your pending transaction:`, 'PIN_SET_SUCCESS');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
+            } else {
+                await sendAndLog(`Invalid PIN. ❌ Enter exactly 4 numbers (e.g., 1234):`, 'PIN_SET_INVALID');
+            }
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_PIN_VERIFY') {
+            if (rawText.trim() === user.transactionPin) {
+                const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
+                const { amount, recipient, billType, customer } = context as any;
+                
+                const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+                const totalDebit = parseFloat(amount) + (config?.flatFee || 0) + (parseFloat(amount) * (config?.feePercentage || 0) / 100);
+                const balance = await WalletService.getBalance(user.id);
+
+                if (balance < totalDebit) {
+                    await sendAndLog(`PIN Verified! ✅ But insufficient funds. ❌ Balance: ₦${balance.toLocaleString()}`, 'INSUFFICIENT_POST_PIN');
+                } else {
+                    await sendAndLog(`Authorization successful! 🚀 Processing...`, 'PIN_AUTHORIZED');
+                    const reference = `${recipient ? 'CP' : 'BILL'}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+                    if (recipient) {
+                        await prisma.transaction.create({ data: { userId: user.id, type: 'P2P_SEND', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FINCRA', description: `Transfer to ${recipient}` } });
+                        await sendAndLog(`Success! ✅ Sent ₦${amount} to ${recipient}. Ref: ${reference}`, 'TRANSFER_SUCCESS');
+                    } else if (billType) {
+                        await FlutterwaveService.payBill(parseFloat(amount), customer, billType, reference);
+                        await prisma.transaction.create({ data: { userId: user.id, type: 'BILL_PAYMENT', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FLUTTERWAVE', description: `${billType} payment for ${customer}` } });
+                        await sendAndLog(`Success! ✅ Your ${billType} bill is settled. Ref: ${reference}`, 'BILL_SUCCESS');
+                    }
+                }
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+            } else {
+                await sendAndLog(`Incorrect PIN. ❌ Verification failed. Please try again:`, 'PIN_INCORRECT');
+            }
+            return;
+        }
+
         if (session.currentState === 'AWAITING_BILL_CONFIRM') {
             const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
             if (rawText.toLowerCase().includes('yes') || rawText.toLowerCase().includes('confirm')) {
-                const { amount, customer, billType } = context as any;
-                
-                // Live Balance Check
-                const balance = await WalletService.getBalance(user.id);
-                if (balance < parseFloat(amount)) {
-                    await sendAndLog(`Insufficient funds for this bill. ❌ Balance: ₦${balance.toLocaleString()}`, 'BILL_INSUFFICIENT');
-                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
-                    return;
+                if (!user.transactionPin) {
+                    await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to authorize your payment:`, 'PIN_SETUP_START');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
+                } else {
+                    await sendAndLog(`Please enter your *4-digit PIN* to authorize this bill payment:`, 'PIN_VERIFY_REQUEST');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
                 }
-
-                await sendAndLog(`Processing your ${billType} payment of ₦${amount}... ⏳`, 'BILL_PROCESSING');
-
-                try {
-                    const reference = `BILL-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-                    // In a real scenario, we'd map billType to a Flutterwave biller code
-                    // For now, using the billType directly as the name
-                    await FlutterwaveService.payBill(parseFloat(amount), customer, billType, reference);
-
-                    await prisma.transaction.create({
-                        data: {
-                            userId: user.id,
-                            type: 'BILL_PAYMENT',
-                            amount: parseFloat(amount),
-                            currency: 'NGN',
-                            status: 'SUCCESS',
-                            reference,
-                            provider: 'FLUTTERWAVE',
-                            description: `${billType} payment for ${customer}`
-                        }
-                    });
-
-                    await sendAndLog(`Success! ✅ Your ${billType} has been paid. Ref: ${reference}`, 'BILL_SUCCESS');
-                } catch (e: any) {
-                    await sendAndLog(`Payment failed: ${e.message}. Please check your balance and try again.`, 'BILL_FAILED');
-                }
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else {
                 await sendAndLog(`Payment cancelled. ❌`, 'BILL_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
@@ -256,7 +233,7 @@ export class WebhookController {
         }
 
         if (rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText.toLowerCase().includes('hi')) {
-            const menuMsg = `🏦 *ChatPay Command Menu*\n\n💰 *Wallets*: "Check Balance"\n🚀 *Send Money*: "Send 5k to John"\n💡 *Bills*: "Pay DSTV" or "Buy Airtime"\n🌐 *International*: "Create USD Card"\n₿ *Crypto*: "Buy $20 USDT"\n📜 *Giftcards*: "Sell Amazon card"\n📄 *Invoicing*: "Create 20k invoice"\n\nHow can I help you right now?`;
+            const menuMsg = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nYour finances, now entirely natively on WhatsApp.\n\n*Our Ecosystem:*\n🏦 *Banking*: Individual & Fixed Business Virtual Accounts.\n🌐 *Dollar Cards*: Instant USD Virtual Cards for global payments.\n💸 *Transfers*: Swift local & foreign payouts.\n💡 *Bills*: Airtime, Data, & utilities.\n₿ *Crypto & Cards*: Trade BTC/USDT & Gift Cards instantly.\n\n*Try these commands:*\n- "Check my balance"\n- "Send 5k to John"\n- "Buy $20 USDT"\n- "Create a USD card"\n- "Pay DSTV bill"\n\nHow can I help you right now?`;
             await sendAndLog(menuMsg, 'HELP_MENU');
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
             return;

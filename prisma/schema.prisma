@@ -17,6 +17,7 @@ model User {
   fincraWalletId   String?
   fincraCustomerId String?
   suspended        Boolean           @default(false)
+  transactionPin   String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   transactions     Transaction[]
