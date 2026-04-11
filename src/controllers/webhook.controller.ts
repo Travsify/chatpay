@@ -183,7 +183,7 @@ export class WebhookController {
         if (session.currentState === 'AWAITING_TYPE') {
             const choice = rawText.toLowerCase();
             if (choice.includes('personal') || choice.includes('individual') || choice === '1') {
-                await sendAndLog(`Great! Please provide your *BVN or NIN* for private verification. 🛡️`, 'SIGNUP_KYC');
+                await sendAndLog(`Great! Kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ type: 'individual' }) } });
             } else if (choice.includes('business') || choice.includes('company') || choice === '2') {
                 await sendAndLog(`Understood. Please provide your *Registered Business Name*:`, 'SIGNUP_BUSINESS_NAME');
@@ -220,7 +220,7 @@ export class WebhookController {
                     } 
                 });
                 
-                await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please long-press and delete your previous message containing your BVN/NIN to protect yourself from unauthorized access to your device.`, 'KYC_SECURITY_NOTICE');
+                await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please long-press and delete your previous message containing your BVN to protect yourself from unauthorized access to your device.`, 'KYC_SECURITY_NOTICE');
                 await sendAndLog(`Verified! ✅ Finalizing your ${isBusiness ? 'Business' : 'Individual'} wallet setup...`, 'KYC_VERIFIED');
                 try {
                     const wallet = await WalletService.setupUserWallet(user.id, isBusiness ? 'business' : 'individual', context.businessName);
@@ -233,7 +233,7 @@ export class WebhookController {
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else {
-                await sendAndLog(`Invalid ${isBusiness ? 'CAC Number' : 'BVN/NIN'}. ❌ Please enter valid credentials to secure your wallet.`, 'KYC_INVALID');
+                await sendAndLog(`Invalid ${isBusiness ? 'CAC Number' : 'BVN'}. ❌ Please enter valid credentials to secure your wallet.`, 'KYC_INVALID');
             }
             return;
         }
