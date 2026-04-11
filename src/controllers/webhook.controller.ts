@@ -45,6 +45,7 @@ export class WebhookController {
                 // 1. Unified Extraction (Text, Voice, Buttons)
                 if (msg.type === 'action' && msg.action?.id) {
                     rawText = msg.action.id;
+                    if (rawText.includes(':')) rawText = rawText.split(':').pop() || rawText;
                 } else if (msg.type === 'audio' || msg.type === 'voice') {
                     isAudio = true;
                     try {
@@ -62,6 +63,7 @@ export class WebhookController {
                     rawText = 'SYSTEM_CALL_REJECTED';
                 } else if (msg.type === 'interactive' || msg.interactive || msg.button_reply || msg.list_reply) {
                     rawText = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button_reply?.id || msg.list_reply?.id || '';
+                    if (rawText.includes(':')) rawText = rawText.split(':').pop() || rawText;
                 } else {
                     rawText = msg.text?.body || '';
                 }
