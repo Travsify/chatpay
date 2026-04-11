@@ -121,7 +121,10 @@ export class WebhookController {
             await WebhookController.logWebhook('OUTBOUND', phoneNumber, JSON.stringify({ body: message }), 'PROCESSED');
         };
 
-        // 0. Session Reset Command
+        // 0. Global Priority Commands (Reset, Menu, Help)
+        const isMenu = rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText === 'HOME' || rawText.toLowerCase() === 'home';
+        const isHi = rawText.toLowerCase().includes('hi') || rawText.toLowerCase().includes('hello');
+        
         if (rawText.toLowerCase() === 'reset') {
             await prisma.session.deleteMany({ where: { userId: user.id } });
             await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING' } });
@@ -129,33 +132,32 @@ export class WebhookController {
             return;
         }
 
-        // 0. New User Global Entry & Proactive Greeting
-        if (session.currentState === 'START') {
-            const welcomeMsg = `✨ *Welcome to ChatPay: The World's First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion. I don't just manage your money; I help you conquer the global financial landscape right here on WhatsApp.\n\n*Here is what I can do for you right now:*\n🌍 *Multi-Currency Accounts*: Get instant NGN/USD/EUR/GBP banking details.\n💸 *High-Speed Transfers*: Move funds to any Nigerian bank in seconds.\n💡 *Smart Bills*: One-tap payments for Airtime, Data, and Power.\n💳 *USD Virtual Cards*: Shop globally with our Master/Visa cards.\n₿ *Crypto Transactions*: Buy/Sell BTC & USDT at the best market rates.\n🎁 *Asset Trading*: Trade your Gift Cards for instant cash.\n\n*To activate your secure global vault and experience the future of banking, what is your Full Name?*`;
-            
-            try {
-                await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", [
-                    { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
-                    { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
-                    { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
-                ]);
-            } catch (e) {
-                // Fallback to text if list fails
-                await whapiService.sendMessage(phoneNumber, welcomeMsg);
-            }
-            
-            // Log outbound for visibility
-            await prisma.conversationLog.create({
-                data: {
-                    userId: user.id,
-                    direction: 'OUTBOUND',
-                    message: welcomeMsg,
-                    intent: 'GREETING',
-                    aiResponse: welcomeMsg
+        if (isMenu || (isHi && session.currentState === 'START')) {
+            if (!user.name || session.currentState === 'START') {
+                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion. I don't just manage your money; I help you conquer the global financial landscape right here on WhatsApp.\n\n*Here is what I can do for you right now:*\n🌍 *Multi-Currency Accounts*: Get instant NGN/USD/EUR/GBP banking details.\n💸 *High-Speed Transfers*: Move funds to any Nigerian bank in seconds.\n💡 *Smart Bills*: One-tap payments for Airtime, Data, and Power.\n💳 *USD Virtual Cards*: Shop globally with our Master/Visa cards.\n₿ *Crypto Transactions*: Buy/Sell BTC & USDT at the best market rates.\n🎁 *Asset Trading*: Trade your Gift Cards for instant cash.\n\n*To activate your secure global vault and experience the future of banking, what is your Full Name?*`;
+                try {
+                    await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", [
+                        { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
+                        { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
+                        { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
+                    ]);
+                } catch (e) {
+                    await whapiService.sendMessage(phoneNumber, welcomeMsg);
                 }
-            });
-
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
+            } else {
+                const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nManaging your finances has never been this easy. Please select an action from the menu below:`;
+                await whapiService.sendList(user.phoneNumber, menuTxt, "📱 Banking Menu", [
+                    { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your current funds" },
+                    { id: "SEND_MONEY_FLOW", title: "💸 Send Money", description: "Transfer to any bank" },
+                    { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, Power" },
+                    { id: "CREATE_CARD", title: "💳 Virtual Cards", description: "USD Global Shopping Card" },
+                    { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
+                    { id: "OPEN_ACCOUNT_USD", title: "🌍 Open USD Account", description: "Get a US Bank Account" },
+                    { id: "HOME", title: "🏠 Home", description: "Refresh this menu" }
+                ]);
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
+            }
             return;
         }
 
@@ -294,21 +296,6 @@ export class WebhookController {
                 await sendAndLog(`Payment cancelled. ❌`, 'BILL_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             }
-            return;
-        }
-
-        if (rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText.toLowerCase().includes('hi') || rawText === 'HOME' || rawText.toLowerCase() === 'home') {
-            const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nManaging your finances has never been this easy. Please select an action from the menu below:`;
-            await whapiService.sendList(user.phoneNumber, menuTxt, "📱 Banking Menu", [
-                { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your current funds" },
-                { id: "SEND_MONEY_FLOW", title: "💸 Send Money", description: "Transfer to any bank" },
-                { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, Power" },
-                { id: "CREATE_CARD", title: "💳 Virtual Cards", description: "USD Global Shopping Card" },
-                { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
-                { id: "OPEN_ACCOUNT_USD", title: "🌍 Open USD Account", description: "Get a US Bank Account" },
-                { id: "HOME", title: "🏠 Home", description: "Refresh this menu" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
             return;
         }
 
