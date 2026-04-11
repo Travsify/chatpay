@@ -24,7 +24,7 @@ app.get('/api/status', (req, res) => {
     const p = path.join(__dirname, '../frontend/dist');
     res.json({ 
         message: 'ChatPay API — Operational',
-        version: '3.5.0',
+        version: '3.6.0',
         timestamp: new Date().toISOString(),
         frontendPath: p,
         frontendExists: fs.existsSync(p)

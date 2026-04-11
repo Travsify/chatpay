@@ -8,7 +8,8 @@
     "start": "npx prisma db push --accept-data-loss && node dist/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'npx ts-node' src/index.ts",
     "prebuild": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true, force: true })\"",
-    "postinstall": "npx prisma generate",
+    "build": "cd frontend && npm install && npm run build && cd .. && npx tsc",
+    "postinstall": "npx prisma generate && npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
