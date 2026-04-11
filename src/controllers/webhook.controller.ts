@@ -157,7 +157,7 @@ export class WebhookController {
 
         if (isMenu || (isHi && session.currentState === 'START')) {
             if (!user.name || user.kycStatus !== 'VERIFIED') {
-                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion. I don't just manage your money; I help you conquer the global financial landscape right here on WhatsApp.\n\n*Here is what I can do for you right now:*\n🌍 *Multi-Currency Accounts*: Get instant NGN/USD/EUR/GBP banking details.\n💸 *High-Speed Transfers*: Move funds to any Nigerian bank in seconds.\n💡 *Smart Bills*: One-tap payments for Airtime, Data, and Power.\n💳 *USD Virtual Cards*: Shop globally with our Master/Visa cards.\n₿ *Crypto Transactions*: Buy/Sell BTC & USDT at the best market rates.\n🎁 *Asset Trading*: Trade your Gift Cards for instant cash.\n\n*To activate your secure global vault and experience the future of banking, what is your Full Name?*`;
+                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*\n\n⚠️ *Note*: Use the exact name on your **BVN or ID Card** to avoid bank verification errors.`;
                 try {
                     await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", [
                         { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
@@ -518,16 +518,25 @@ export class WebhookController {
                 } else {
                     // Auto-retry wallet creation if it failed during onboarding
                     if (!user.fincraCustomerId) {
-                        await sendAndLog(`Setting up your wallet now... ⏳`, 'WALLET_RETRY');
                         try {
                             const wallet = await WalletService.setupUserWallet(user.id, 'individual');
                             user = await prisma.user.findUnique({ where: { id: user.id } }) as any;
-                            const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
-                            await sendAndLog(bankDetails, 'WALLET_CREATED');
+                            const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\nBalance: ₦0\n\n_Fund your account using the details above to get started._`;
+                            await whapiService.sendButtons(phoneNumber, bankDetails, [
+                                { id: "HOME", title: "🏠 Home" },
+                                { id: "FUND_WALLET", title: "🏦 Fund Wallet" }
+                            ]);
                             break;
-                        } catch (e) {
-                            console.error('[Wallet] Auto-retry failed:', e);
-                            await sendAndLog(`We're having trouble connecting to the bank. Please try again in a moment.`, 'WALLET_RETRY_FAILED');
+                        } catch (e: any) {
+                            const errorMsg = e.response?.data?.error || e.message;
+                            console.error('[Wallet] Onboarding Error:', errorMsg);
+                            
+                            if (errorMsg?.toLowerCase().includes('match the provided name')) {
+                                const failMsg = `⚠️ *Name Mismatch Error*\n\nYour BVN verification failed because the name you provided (*${user.name}*) does not match the legal name on your BVN record.\n\nPlease type *'Reset'* to restart and use your **Exact Legal Names** as they appear on your ID card.`;
+                                await sendAndLog(failMsg, 'KYC_NAME_MISMATCH');
+                            } else {
+                                await sendAndLog(`We're having trouble connecting to the bank. Please try again in a moment.`, 'WALLET_RETRY_FAILED');
+                            }
                             break;
                         }
                     }
