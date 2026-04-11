@@ -21,10 +21,15 @@ app.use(bodyParser.json());
 
 // Health check JSON
 app.get('/api/status', (req, res) => {
+    const p = path.join(process.cwd(), 'frontend', 'dist');
     res.json({ 
         message: 'ChatPay API — Operational',
         version: '3.1.0',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        cwd: process.cwd(),
+        frontendExists: fs.existsSync(p),
+        __dirname: __dirname,
+        contents: fs.existsSync(process.cwd() + '/frontend') ? fs.readdirSync(process.cwd() + '/frontend') : []
     });
 });
 
