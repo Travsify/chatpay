@@ -161,10 +161,15 @@ export class WebhookController {
             if (rawText.toLowerCase().includes('yes') || rawText.toLowerCase().includes('confirm')) {
                 const { amount, recipient } = context as any;
                 
-                // 1. Live Balance Check
+                // 1. Live Balance Check with Admin Fees
+                const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+                const flatFee = config?.flatFee || 0;
+                const percFee = (parseFloat(amount) * (config?.feePercentage || 0)) / 100;
+                const totalDebit = parseFloat(amount) + flatFee + percFee;
+
                 const balance = await WalletService.getBalance(user.id);
-                if (balance < parseFloat(amount)) {
-                    await sendAndLog(`Insufficient funds. ❌ Your balance is ₦${balance.toLocaleString()}. Please fund your account to continue.`, 'TRANSFER_INSUFFICIENT');
+                if (balance < totalDebit) {
+                    await sendAndLog(`Insufficient funds. ❌ Total required: ₦${totalDebit.toLocaleString()} (incl. ₦${flatFee + percFee} fee). Your balance is ₦${balance.toLocaleString()}.`, 'TRANSFER_INSUFFICIENT');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
                     return;
                 }
@@ -360,7 +365,12 @@ export class WebhookController {
                     if (!amount || !asset) {
                         await sendAndLog(`Please specify the amount (in USD) and asset (USDT/BTC).`, 'MISSING_ENTITIES');
                     } else {
-                        await sendAndLog(`Executing Market Buy for $${amount} *${asset.toUpperCase()}*... ₿ 🚀`, 'CRYPTO_PROCESSING');
+                        // Using Admin Exchange Rate + Markup
+                        const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+                        const sellRate = (config?.usdExchangeRate || 1500) + (config?.usdMarkup || 50);
+                        const totalNaira = parseFloat(String(amount)) * sellRate;
+                        
+                        await sendAndLog(`Executing Market Buy for $${amount} *${asset.toUpperCase()}*... @ ₦${sellRate}/$\nTotal: ₦${totalNaira.toLocaleString()}\n₿ 🚀`, 'CRYPTO_PROCESSING');
                         try {
                             const result = await quidaxService.buyCrypto(user.id, asset, parseFloat(String(amount)));
                             await sendAndLog(`Success! ✅ Your ${asset.toUpperCase()} has been purchased. Ref: ${result.data?.id || 'PROCESSED'}`, 'CRYPTO_SUCCESS');

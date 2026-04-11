@@ -115,6 +115,14 @@ model SystemConfig {
   whapiWebhookUrl   String?
   quidaxSecret      String?
   prestmitSecret    String?
+  
+  // Financial Rules
+  feePercentage     Float    @default(0.5)
+  flatFee           Float    @default(50.0)
+  usdExchangeRate   Float    @default(1500.0)
+  usdMarkup         Float    @default(50.0)
+  dailyLimit        Float    @default(500000.0)
+  
   updatedAt         DateTime @updatedAt
 }
 

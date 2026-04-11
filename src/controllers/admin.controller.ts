@@ -33,7 +33,7 @@ export class AdminController {
     static async updateSystemConfig(req: AuthRequest, res: Response) {
         try {
             const data = req.body;
-            const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'whapiApiUrl', 'whapiWebhookUrl', 'quidaxSecret', 'prestmitSecret'];
+            const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'whapiApiUrl', 'whapiWebhookUrl', 'quidaxSecret', 'prestmitSecret', 'feePercentage', 'flatFee', 'usdExchangeRate', 'usdMarkup', 'dailyLimit'];
             const updateData: any = {};
             
             allowedFields.forEach(field => {
