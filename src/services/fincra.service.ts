@@ -11,6 +11,16 @@ export class FincraService {
         return 'https://api.fincra.com';
     }
 
+    private async getHeaders() {
+        const apiKey = await this.getApiKey();
+        return {
+            'api-key': apiKey,
+            'x-business-id': process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        };
+    }
+
     /**
      * Create an NGN virtual account directly (no separate customer step needed).
      * Endpoint: POST /profile/virtual-accounts/requests
@@ -64,11 +74,7 @@ export class FincraService {
             console.log('[Fincra] Creating virtual account:', JSON.stringify(payload));
             
             const response = await axios.post(`${baseUrl}/profile/virtual-accounts/requests`, payload, {
-                headers: { 
-                    'api-key': apiKey, 
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
+                headers: await this.getHeaders()
             });
 
             console.log('[Fincra] Virtual account created:', JSON.stringify(response.data));
@@ -85,10 +91,9 @@ export class FincraService {
      */
     async getVirtualAccount(virtualAccountId: string) {
         try {
-            const apiKey = await this.getApiKey();
             const baseUrl = this.getBaseUrl();
             const response = await axios.get(`${baseUrl}/profile/virtual-accounts/${virtualAccountId}`, {
-                headers: { 'api-key': apiKey, 'Accept': 'application/json' }
+                headers: await this.getHeaders()
             });
             return response.data;
         } catch (error: any) {
@@ -103,10 +108,9 @@ export class FincraService {
      */
     async listVirtualAccounts(currency: string = 'ngn') {
         try {
-            const apiKey = await this.getApiKey();
             const baseUrl = this.getBaseUrl();
             const response = await axios.get(`${baseUrl}/profile/virtual-accounts/?currency=${currency}`, {
-                headers: { 'api-key': apiKey, 'Accept': 'application/json' }
+                headers: await this.getHeaders()
             });
             return response.data;
         } catch (error: any) {
@@ -121,10 +125,9 @@ export class FincraService {
      */
     async getWalletBalance() {
         try {
-            const apiKey = await this.getApiKey();
             const baseUrl = this.getBaseUrl();
             const response = await axios.get(`${baseUrl}/wallets`, {
-                headers: { 'api-key': apiKey, 'Accept': 'application/json' }
+                headers: await this.getHeaders()
             });
             return response.data;
         } catch (error: any) {
@@ -152,10 +155,9 @@ export class FincraService {
         }
     }) {
         try {
-            const apiKey = await this.getApiKey();
             const baseUrl = this.getBaseUrl();
             const response = await axios.post(`${baseUrl}/disbursements/payouts`, data, {
-                headers: { 'api-key': apiKey, 'Content-Type': 'application/json', 'Accept': 'application/json' }
+                headers: await this.getHeaders()
             });
             return response.data;
         } catch (error: any) {
