@@ -47,20 +47,16 @@ export class WhapiService {
             rawToken = 'eoR2mA57NDEn40E6OrfrD6y5PcajTBjx';
         }
 
-        // FINAL SANITIZATION: DEFINITIVE FIX - Aggressive ASCII filter + Latin1 Buffer encoding
-        // This removes ALL non-header-safe characters including newlines, tabs, and hidden Unicode.
+        // FINAL SANITIZATION
         const clean = rawToken.replace(/[^\x20-\x7E]/g, '').trim();
         return Buffer.from(clean, 'utf-8').toString('latin1');
     }
 
     async sendMessage(to: string, body: string) {
         const token = await this.getToken();
-        const cleanTo = to.replace(/\D/g, ''); // Ensure no +, spaces, etc.
-        
-        console.log(`[Whapi] Sending message to ${cleanTo}...`);
+        const cleanTo = to.replace(/\D/g, ''); 
         
         if (!token || token === '' || token === 'your_whapi_token_here') {
-            console.log(`[MOCK WHAPI] Sending to ${cleanTo}: ${body}`);
             return { sent: true, mock: true };
         }
         try {
@@ -75,7 +71,6 @@ export class WhapiService {
                     'Content-Type': 'application/json'
                 }
             });
-            console.log(`[Whapi] Response Status: ${response.status} | Data:`, JSON.stringify(response.data));
             return response.data;
         } catch (error: any) {
             console.error('Whapi delivery failure:', error.response?.data || error.message);
@@ -106,14 +101,8 @@ export class WhapiService {
 
     async registerWebhook(webhookUrl: string) {
         const token = await this.getToken();
-        
-        // Debug logging (masking middle for security)
-        const maskedToken = token ? `${token.substring(0, 6)}...${token.substring(token.length - 4)}` : 'NONE';
-        console.log(`[Whapi] Attempting to sync webhook to ${webhookUrl} using token: ${maskedToken}`);
-
         try {
             const apiUrl = await this.getUrl();
-            // Updated structure to match standard Whapi.cloud settings payload
             const response = await axios.patch(`${apiUrl}/settings`, {
                 webhooks: [
                     {
@@ -131,14 +120,12 @@ export class WhapiService {
                     'Content-Type': 'application/json'
                 }
             });
-            console.log('[Whapi] Sync success:', response.status);
             return response.data;
         } catch (error: any) {
-            const errorData = error.response?.data || error.message;
-            console.error('[Whapi] Sync failure details:', JSON.stringify(errorData));
             throw error;
         }
     }
+
     async getFileBuffer(fileId: string): Promise<Buffer> {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
@@ -149,7 +136,6 @@ export class WhapiService {
             });
             return Buffer.from(response.data);
         } catch (error: any) {
-            console.error('[Whapi] Media download failed:', error.message);
             throw error;
         }
     }
@@ -158,105 +144,76 @@ export class WhapiService {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
         try {
-            // WHAPI uses base64 for direct buffer uploads
             const base64 = `data:audio/ogg;base64,${audioBuffer.toString('base64')}`;
-            const response = await axios.post(`${apiUrl}/messages/audio`, {
-                to,
-                media: base64
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+            await axios.post(`${apiUrl}/messages/audio`, { to, media: base64 }, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            return response.data;
         } catch (error: any) {
             console.error('[Whapi] Audio send failed:', error.response?.data || error.message);
         }
     }
 
-    async sendList(to: string, text: string, buttonText: string, rows: { id: string; title: string; description?: string }[]) {
+    async sendButtons(to: string, text: string, buttons: { id: string, title: string }[]) {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
-        let cleanTo = to.replace(/\D/g, '');
-        if (!cleanTo.includes('@')) cleanTo += '@s.whatsapp.net';
+        const numericTo = to.replace(/\D/g, '');
+        const payload = {
+            to: numericTo,
+            body: text,
+            typing_time: 0,
+            action: {
+                buttons: buttons.map(b => ({
+                    type: 'quick_reply',
+                    reply: {
+                        id: b.id,
+                        title: b.title.substring(0, 20)
+                    }
+                }))
+            }
+        };
 
         try {
-            const numericTo = to.replace(/\D/g, '');
-            const response = await axios.post(`${apiUrl}/messages/interactive`, {
-                to: numericTo,
-                type: 'list',
-                body: { text: text },
-                action: {
-                    list: {
-                        label: buttonText.replace(/[^\w\s]/gi, '').trim().slice(0, 20),
-                        sections: [{
-                            title: "Select Service",
-                            rows: rows.map(r => ({
-                                id: r.id,
-                                title: r.title.replace(/[^\w\s]/gi, '').trim().slice(0, 24),
-                                ...(r.description ? { description: r.description.slice(0, 72) } : {})
-                            }))
-                        }]
-                    }
-                }
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+            await axios.post(`${apiUrl}/messages/interactive`, payload, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            return response.data;
         } catch (error: any) {
-            const errorData = error.response?.data || error.message;
-            console.error('[Whapi] List send failed, falling back to text:', JSON.stringify(errorData));
-            
-            // Format fallback text
-            let fallbackText = `${text}\n\n*${buttonText}:*\n`;
-            rows.forEach((row, idx) => {
-                fallbackText += `${idx + 1}. *${row.title}*${row.description ? ` - ${row.description}` : ''}\n`;
-            });
-            fallbackText += `\n_Reply with the option name or number._`;
-
-            return await this.sendMessage(cleanTo, fallbackText);
+            console.error('[Whapi] Button send failed, falling back to text:', error.response?.data || error.message);
+            const btnList = buttons.map((b, i) => `${i + 1}. *${b.title}*`).join('\n');
+            await this.sendMessage(numericTo, `${text}\n\n${btnList}`);
         }
     }
 
-    async sendButtons(to: string, text: string, buttons: { id: string; title: string }[], footer?: string) {
+    async sendList(to: string, text: string, button: string, options: { id: string, title: string, description?: string }[]) {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
-        let cleanTo = to.replace(/\D/g, '');
-        if (!cleanTo.includes('@')) cleanTo += '@s.whatsapp.net';
+        const numericTo = to.replace(/\D/g, '');
+        const payload = {
+            to: numericTo,
+            body: text,
+            typing_time: 0,
+            action: {
+                button,
+                sections: [
+                    {
+                        title: button.substring(0, 24),
+                        rows: options.map(opt => ({
+                            id: opt.id,
+                            title: opt.title.substring(0, 24),
+                            description: opt.description?.substring(0, 72)
+                        }))
+                    }
+                ]
+            }
+        };
 
         try {
-            const numericTo = to.replace(/\D/g, '');
-            const response = await axios.post(`${apiUrl}/messages/interactive`, {
-                to: numericTo,
-                type: 'button',
-                body: { text: text },
-                ...(footer ? { footer: { text: footer } } : {}),
-                action: {
-                    buttons: buttons.map(b => ({
-                        type: 'quick_reply',
-                        id: b.id,
-                        title: b.title.replace(/[^\w\s]/gi, '').trim().slice(0, 20)
-                    }))
-                }
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+            await axios.post(`${apiUrl}/messages/interactive`, payload, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
             });
-            return response.data;
         } catch (error: any) {
-            console.error('[Whapi] Button send failed, falling back to text:', error.response?.data || error.message);
-            let fallbackText = `${text}\n\n`;
-            buttons.forEach(b => {
-                fallbackText += `• *${b.title}*\n`;
-            });
-            if (footer) fallbackText += `\n_${footer}_`;
-            return await this.sendMessage(cleanTo, fallbackText);
+            console.error('[Whapi] List send failed, falling back to text:', error.response?.data || error.message);
+            const listItems = options.map((opt, i) => `${i + 1}. *${opt.title}*`).join('\n');
+            await this.sendMessage(numericTo, `${text}\n\n${listItems}`);
         }
     }
 
@@ -269,8 +226,7 @@ export class WhapiService {
             });
             return response.data;
         } catch (error: any) {
-             console.error('[Whapi] Health Check Failed:', error.response?.data?.message || error.message);
-             return { status: 'ERROR', error: error.response?.data || error.message };
+             return { status: 'ERROR' };
         }
     }
 }

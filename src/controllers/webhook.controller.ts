@@ -186,7 +186,7 @@ export class WebhookController {
 
         // ===== SECURITY: KYC GATEWAY =====
         const bankingCommands = ['CHECK_BALANCE', 'FUND_WALLET', 'SEND_MONEY', 'PAY_BILLS', 'CARD_MENU', 'ASSET_TRADING', 'GLOBAL_ACCOUNTS', 'GLOBAL_WALLETS'];
-        if (bankingCommands.includes(rawText) && (user.kycStatus !== 'VERIFIED' || !user.fincraWalletId)) {
+        if (bankingCommands.includes(rawText) && user.kycStatus !== 'VERIFIED') {
             await sendAndLog(`🔐 *Security Guard:* You must complete your account activation before accessing banking features.`, 'KYC_REQUIRED');
             return WebhookController.processLogic(user, session, aiResult, 'MENU');
         }
