@@ -158,7 +158,6 @@ export class WebhookController {
                 const { amount, recipient } = context as any;
                 await sendAndLog(`Sending ₦${amount} to ${recipient}... 🚀`, 'TRANSFER_PROCESSING');
 
-                // Create transaction record
                 const reference = `CP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
                 await prisma.transaction.create({
                     data: {
@@ -173,10 +172,47 @@ export class WebhookController {
                     }
                 });
 
-                await sendAndLog(`Success! Transaction ref: ${reference}`, 'TRANSFER_SUCCESS');
+                await sendAndLog(`Success! ✅ Transaction ref: ${reference}`, 'TRANSFER_SUCCESS');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else {
                 await sendAndLog(`Transaction cancelled. ❌`, 'TRANSFER_CANCELLED');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+            }
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_BILL_CONFIRM') {
+            const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
+            if (rawText.toLowerCase().includes('yes') || rawText.toLowerCase().includes('confirm')) {
+                const { amount, customer, billType } = context as any;
+                await sendAndLog(`Processing your ${billType} payment of ₦${amount}... ⏳`, 'BILL_PROCESSING');
+
+                try {
+                    const reference = `BILL-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+                    // In a real scenario, we'd map billType to a Flutterwave biller code
+                    // For now, using the billType directly as the name
+                    await FlutterwaveService.payBill(parseFloat(amount), customer, billType, reference);
+
+                    await prisma.transaction.create({
+                        data: {
+                            userId: user.id,
+                            type: 'BILL_PAYMENT',
+                            amount: parseFloat(amount),
+                            currency: 'NGN',
+                            status: 'SUCCESS',
+                            reference,
+                            provider: 'FLUTTERWAVE',
+                            description: `${billType} payment for ${customer}`
+                        }
+                    });
+
+                    await sendAndLog(`Success! ✅ Your ${billType} has been paid. Ref: ${reference}`, 'BILL_SUCCESS');
+                } catch (e: any) {
+                    await sendAndLog(`Payment failed: ${e.message}. Please check your balance and try again.`, 'BILL_FAILED');
+                }
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+            } else {
+                await sendAndLog(`Payment cancelled. ❌`, 'BILL_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             }
             return;
@@ -226,6 +262,28 @@ export class WebhookController {
                     await sendAndLog(`💰 Your ChatPay Balance:\n₦${balance.toLocaleString()}\n\nAccount: ${user.fincraWalletId || 'Pending'}\nBank: Wema (ChatPay)`, 'BALANCE_CHECK');
                 }
                 break;
+            
+            case 'PAY_BILL':
+                if (user.kycStatus !== 'VERIFIED') {
+                    await sendAndLog(`Please verify your identity first to pay bills.`, 'UNVERIFIED_ATTEMPT');
+                } else {
+                    const { amount, billType, customer } = aiResult.entities || {};
+                    const targetCustomer = customer || phoneNumber; 
+                    
+                    if (!amount || !billType) {
+                        await sendAndLog(`Please specify the amount and what you want to pay for (e.g. Airtime, DSTV).`, 'MISSING_ENTITIES');
+                    } else {
+                        await sendAndLog(`Confirm paying ₦${amount} for *${billType}* to ${targetCustomer}? (Yes/No)`, 'BILL_CONFIRM');
+                        await prisma.session.update({
+                            where: { id: session.id },
+                            data: { 
+                                currentState: 'AWAITING_BILL_CONFIRM', 
+                                context: JSON.stringify({ amount, billType, customer: targetCustomer }) 
+                            }
+                        });
+                    }
+                }
+                break;
 
             case 'INVOICE':
                 if (user.kycStatus !== 'VERIFIED') {
@@ -238,7 +296,6 @@ export class WebhookController {
                         const invoiceRef = `inv_${Math.random().toString(36).substr(2, 6)}`;
                         const invoiceLink = `https://chatpayapp.online/pay/${invoiceRef}`;
 
-                        // Record transaction
                         await prisma.transaction.create({
                             data: {
                                 userId: user.id,
@@ -256,10 +313,11 @@ export class WebhookController {
                     }
                 }
                 break;
-
+            case 'UNKNOWN':
             default:
                 const response = await aiService.generateResponse(`User: "${rawText}". Respond as ChatPay bot — a WhatsApp banking assistant. Keep response concise and helpful.`);
                 await sendAndLog(response, 'AI_FALLBACK');
+                break;
         }
     }
 
@@ -277,7 +335,7 @@ export class WebhookController {
                 data: {
                     direction,
                     phoneNumber,
-                    payload: payload.substring(0, 2000), // Cap payload size
+                    payload: payload.substring(0, 2000), 
                     status,
                     latencyMs: latencyMs || null,
                     errorMsg: errorMsg || null
