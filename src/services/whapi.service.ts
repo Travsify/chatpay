@@ -182,17 +182,17 @@ export class WhapiService {
         if (!cleanTo.includes('@')) cleanTo += '@s.whatsapp.net';
 
         try {
+            const numericTo = to.replace(/\D/g, '');
             const response = await axios.post(`${apiUrl}/messages/interactive`, {
-                to: cleanTo,
+                to: numericTo,
                 body: { text: text },
                 action: {
-                    button: buttonText,
+                    button: buttonText.replace(/[^\w\s]/gi, '').trim(),
                     sections: [{
-                        title: "Options",
+                        title: "Available Services",
                         rows: rows.map(r => ({
                             id: r.id,
-                            title: r.title.slice(0, 24).replace(/[^\w\s]/gi, '').trim(),
-                            description: r.description ? r.description.slice(0, 72) : undefined
+                            title: r.title.replace(/[^\w\s]/gi, '').trim().slice(0, 24)
                         }))
                     }]
                 }
@@ -225,14 +225,15 @@ export class WhapiService {
         if (!cleanTo.includes('@')) cleanTo += '@s.whatsapp.net';
 
         try {
+            const numericTo = to.replace(/\D/g, '');
             const response = await axios.post(`${apiUrl}/messages/interactive`, {
-                to: cleanTo,
+                to: numericTo,
                 body: { text: text },
                 footer: footer ? { text: footer } : undefined,
                 action: {
                     buttons: buttons.map(b => ({
                         type: 'reply',
-                        reply: { id: b.id, title: b.title }
+                        reply: { id: b.id, title: b.title.replace(/[^\w\s]/gi, '').trim().slice(0, 20) }
                     }))
                 }
             }, {
