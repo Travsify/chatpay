@@ -172,8 +172,11 @@ export class WebhookController {
         }
 
         if (isMenu || (isHi && session.currentState === 'START')) {
-            if (!user.name || user.kycStatus !== 'VERIFIED') {
-                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*\n\n⚠️ *Note*: Use the exact name on your **BVN or ID Card** to avoid bank verification errors.`;
+            const isVerified = user.kycStatus === 'VERIFIED';
+            
+            // Onboarding Users (New or Reset)
+            if (!isVerified) {
+                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*`;
                 const welcomeMenu = [
                     { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
                     { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
@@ -185,8 +188,12 @@ export class WebhookController {
                 } catch (e) {
                     await whapiService.sendMessage(phoneNumber, welcomeMsg);
                 }
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME', context: JSON.stringify({ ...context, lastMenuOptions: welcomeMenu }) } });
+                await prisma.session.update({ 
+                    where: { id: session.id }, 
+                    data: { currentState: 'AWAITING_NAME', context: JSON.stringify({ ...context, lastMenuOptions: welcomeMenu }) } 
+                });
             } else {
+                // Existing Verified Users
                 const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nHow can I help you manage your wealth today? Please select an option:`;
                 const mainMenu = [
                     { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your current funds" },
@@ -199,7 +206,10 @@ export class WebhookController {
                     { id: "HOME", title: "🏠 Home", description: "Refresh this menu" }
                 ];
                 await whapiService.sendList(user.phoneNumber, menuTxt, "📱 Banking Menu", mainMenu);
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: mainMenu, previousState: null }) } });
+                await prisma.session.update({ 
+                    where: { id: session.id }, 
+                    data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: mainMenu, previousState: null }) } 
+                });
             }
             return;
         }
@@ -807,8 +817,11 @@ export class WebhookController {
 
             case 'UNKNOWN':
             default:
-                const response = await aiService.generateResponse(`User: "${rawText}". Respond as ChatPay bot — a WhatsApp banking assistant. Keep response concise and helpful.`);
-                await sendAndLog(response, 'AI_FALLBACK');
+                if (rawText !== 'REFRESH' && !isHi && !isMenu) {
+                    await sendAndLog(aiResult.response || "I'm not exactly sure how to help with that. Let me show you the menu so you can choose an option:", aiResult.intent);
+                    // After AI response, always provide a menu to ensure the user isn't stuck
+                    return WebhookController.processLogic(user, session, aiResult, 'REFRESH');
+                }
                 break;
         }
     }
