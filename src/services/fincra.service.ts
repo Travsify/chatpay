@@ -16,7 +16,7 @@ export class FincraService {
         try {
             const apiKey = await this.getApiKey();
             const baseUrl = await this.getBaseUrl();
-            const response = await axios.post(`${baseUrl}/core/customers`, data, {
+            const response = await axios.post(`${baseUrl}/profile/customers`, data, {
                 headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
             });
             return response.data;
@@ -30,7 +30,7 @@ export class FincraService {
         try {
             const apiKey = await this.getApiKey();
             const baseUrl = await this.getBaseUrl();
-            const response = await axios.post(`${baseUrl}/core/virtual-accounts`, data, {
+            const response = await axios.post(`${baseUrl}/profile/virtual-accounts`, data, {
                 headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
             });
             return response.data;
@@ -44,7 +44,7 @@ export class FincraService {
         try {
             const apiKey = await this.getApiKey();
             const baseUrl = await this.getBaseUrl();
-            const response = await axios.get(`${baseUrl}/core/virtual-accounts?customer=${customerId}`, {
+            const response = await axios.get(`${baseUrl}/profile/virtual-accounts?customer=${customerId}`, {
                 headers: { 'api-key': apiKey }
             });
             return response.data;
@@ -58,7 +58,7 @@ export class FincraService {
         try {
             const apiKey = await this.getApiKey();
             const baseUrl = await this.getBaseUrl();
-            const response = await axios.get(`${baseUrl}/core/wallets/${walletId}`, {
+            const response = await axios.get(`${baseUrl}/profile/wallets/${walletId}`, {
                 headers: { 'api-key': apiKey }
             });
             return response.data;
@@ -72,7 +72,7 @@ export class FincraService {
         try {
             const apiKey = await this.getApiKey();
             const baseUrl = await this.getBaseUrl();
-            const response = await axios.post(`${baseUrl}/core/disbursements`, data, {
+            const response = await axios.post(`${baseUrl}/profile/disbursements`, data, {
                 headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
             });
             return response.data;
