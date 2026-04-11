@@ -23,7 +23,7 @@ app.use(bodyParser.json());
 app.get('/api/status', (req, res) => {
     res.json({ 
         message: 'ChatPay API — Operational',
-        version: '3.1.0',
+        version: '3.2.0',
         timestamp: new Date().toISOString()
     });
 });
