@@ -93,29 +93,61 @@ export class WebhookController {
         // 1. Check Ongoing Flow States
         if (session.currentState === 'AWAITING_NAME') {
             await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
-            await sendAndLog(`Thanks ${rawText}! Please provide your BVN/NIN for verification.`, 'SIGNUP_FLOW');
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC' } });
+            await sendAndLog(`Thanks ${rawText}! 🤝 Is this account for yourself or a business?\n\n1. *Individual* (Personal usage)\n2. *Business* (Company usage)`, 'SIGNUP_TYPE');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE' } });
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_TYPE') {
+            const choice = rawText.toLowerCase();
+            if (choice.includes('personal') || choice.includes('individual') || choice === '1') {
+                await sendAndLog(`Great! Please provide your *BVN or NIN* for private verification. 🛡️`, 'SIGNUP_KYC');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ type: 'individual' }) } });
+            } else if (choice.includes('business') || choice.includes('company') || choice === '2') {
+                await sendAndLog(`Understood. Please provide your *Registered Business Name*:`, 'SIGNUP_BUSINESS_NAME');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ type: 'business' }) } });
+            } else {
+                await sendAndLog(`Please choose 1 for Individual or 2 for Business.`, 'SIGNUP_TYPE_RETRY');
+            }
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_BUSINESS_NAME') {
+            const context = JSON.parse(String(session.context || '{}'));
+            await sendAndLog(`Got it. Now, please provide your *CAC Number* (RC Number) for verification:`, 'SIGNUP_CAC');
+            await prisma.session.update({ where: { id: session.id }, data: { 
+                currentState: 'AWAITING_KYC', 
+                context: JSON.stringify({ ...context, businessName: rawText }) 
+            } });
             return;
         }
 
         if (session.currentState === 'AWAITING_KYC') {
-            await sendAndLog(`Verifying your identity... ⏳`, 'KYC_FLOW');
-            const isVerified = rawText.length >= 10; 
+            const context = JSON.parse(String(session.context || '{}'));
+            const isBusiness = context.type === 'business';
+            
+            await sendAndLog(`Verifying your ${isBusiness ? 'business' : 'identity'} details... ⏳`, 'KYC_FLOW');
+            
+            const isVerified = rawText.length >= 8; // Basic length validation
             if (isVerified) {
-                await prisma.user.update({ where: { id: user.id }, data: { kycStatus: 'VERIFIED' } });
-                await sendAndLog(`Verified! ✅ Finalizing your wallet setup...`, 'KYC_VERIFIED');
+                await prisma.user.update({ 
+                    where: { id: user.id }, 
+                    data: { kycStatus: 'VERIFIED' } 
+                });
+                
+                await sendAndLog(`Verified! ✅ Finalizing your ${isBusiness ? 'Business' : 'Individual'} wallet setup...`, 'KYC_VERIFIED');
                 try {
-                    const wallet = await WalletService.setupUserWallet(user.id);
+                    const wallet = await WalletService.setupUserWallet(user.id, isBusiness ? 'business' : 'individual', context.businessName);
                     
-                    const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
+                    const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Type*: ${isBusiness ? '💼 Business' : '👤 Individual'}\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${isBusiness ? context.businessName : user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
                     
                     await sendAndLog(bankDetails, 'WALLET_CREATED');
                 } catch (e) {
                     await sendAndLog(`Verification complete! ✅ We're finalizing your virtual account now. Type "Balance" in a moment to see your details.`, 'WALLET_PENDING');
                 }
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else {
-                await sendAndLog(`Invalid ID. ❌ Please enter a valid BVN/NIN to secure your wallet.`, 'KYC_INVALID');
+                await sendAndLog(`Invalid ${isBusiness ? 'CAC Number' : 'BVN/NIN'}. ❌ Please enter valid credentials to secure your wallet.`, 'KYC_INVALID');
             }
             return;
         }
