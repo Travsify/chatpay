@@ -191,12 +191,11 @@ export class WebhookController {
         if (isMenu || (isHi && session.currentState === 'START')) {
             const isVerified = user.kycStatus === 'VERIFIED' && user.fincraWalletId;
             
-            // Onboarding Users (New or Reset)
             if (!isVerified) {
-                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*\n\n⚠️ *Note*: Use the exact name on your **BVN or ID Card** to avoid bank verification errors.`;
+                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, choose your account type below:*`;
                 const welcomeMenu = [
-                    { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
-                    { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
+                    { id: "START_INDIVIDUAL", title: "👤 Personal Account", description: "Individual banking & savings" },
+                    { id: "START_BUSINESS", title: "💼 Business Account", description: "For registered companies/entities" },
                     { id: "RESTART_FLOW", title: "🔄 Start Afresh", description: "Wipe progress and restart onboarding" },
                     { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
                 ];
@@ -207,9 +206,10 @@ export class WebhookController {
                 }
                 await prisma.session.update({ 
                     where: { id: session.id }, 
-                    data: { currentState: 'AWAITING_NAME', context: JSON.stringify({ ...context, lastMenuOptions: welcomeMenu }) } 
+                    data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: welcomeMenu }) } 
                 });
             } else {
+                // ... (Existing Verified Menu logic)
                 // Existing Verified Users
                 const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nHow can I help you manage your wealth today? Please select an option:`;
                 const mainMenu = [
@@ -232,33 +232,35 @@ export class WebhookController {
         }
 
         // 1. Check Ongoing Flow States
-        if (session.currentState === 'AWAITING_NAME' || rawText === 'REFRESH' && session.currentState === 'AWAITING_NAME') {
-            if (rawText !== 'REFRESH') {
-                await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
-            }
-            const typeMenu = [
-                { id: "TYPE_INDIVIDUAL", title: "👤 Individual", description: "Personal banking & savings" },
-                { id: "TYPE_BUSINESS", title: "💼 Business", description: "For registered companies/entities" },
-                { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
-            ];
-            await whapiService.sendList(phoneNumber, `Thanks ${rawText !== 'REFRESH' ? rawText : (user.name || 'there')}! 🤝 Is this account for yourself (Personal) or a Business?`, "Select Account Type", typeMenu);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE', context: JSON.stringify({ ...context, lastMenuOptions: typeMenu, previousState: 'AWAITING_NAME' }) } });
+        if (rawText === 'START_INDIVIDUAL') {
+            await sendAndLog(`Great Choice! To setup your *Personal Account*, what is your **Full Legal Name** as it appears on your ID or BVN?`, 'SIGNUP_NAME_PROMPT');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_INDIVIDUAL_NAME', context: JSON.stringify({ ...context, type: 'individual' }) } });
             return;
         }
 
-        if (session.currentState === 'AWAITING_TYPE' || (rawText.startsWith('TYPE_') || rawText === 'REFRESH' && session.currentState === 'AWAITING_TYPE')) {
-            const choice = rawText.replace('TYPE_', '').toLowerCase();
-            if (choice.includes('personal') || choice.includes('individual') || choice === '1' || choice === 'individual') {
-                await sendAndLog(`Great! Kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'AWAITING_TYPE' }) } });
-            } else if (choice.includes('business') || choice.includes('company') || choice === '2' || choice === 'business') {
-                await sendAndLog(`Understood. Please provide your *Registered Business Name*:`, 'SIGNUP_BUSINESS_NAME');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business', previousState: 'AWAITING_TYPE' }) } });
-            } else if (rawText !== 'REFRESH') {
-                await sendAndLog(`Please choose Individual or Business from the menu.`, 'SIGNUP_TYPE_RETRY');
+        if (rawText === 'START_BUSINESS') {
+            await sendAndLog(`Understood. To setup your *Business Account*, please provide your **Registered Business Name**:`, 'SIGNUP_BUSINESS_NAME_PROMPT');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business' }) } });
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_INDIVIDUAL_NAME' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_INDIVIDUAL_NAME')) {
+            if (rawText !== 'REFRESH') {
+                await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
+                await sendAndLog(`Thanks ${rawText}! Finally, kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, name: rawText, previousState: 'AWAITING_INDIVIDUAL_NAME' }) } });
             }
             return;
         }
+
+        if (session.currentState === 'AWAITING_BUSINESS_NAME' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_BUSINESS_NAME')) {
+            if (rawText !== 'REFRESH') {
+                await sendAndLog(`Got it. Now, please provide your business's *CAC Number* (RC Number):`, 'SIGNUP_CAC');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, businessName: rawText, type: 'business', previousState: 'AWAITING_BUSINESS_NAME' }) } });
+            }
+            return;
+        }
+
 
 
 
