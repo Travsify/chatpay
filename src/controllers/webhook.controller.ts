@@ -150,14 +150,14 @@ export class WebhookController {
         const isMenu = rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText === 'HOME' || rawText.toLowerCase() === 'home';
         const isHi = rawText.toLowerCase().includes('hi') || rawText.toLowerCase().includes('hello');
         
-        if (rawText.toLowerCase() === 'reset') {
+        if (rawText.toLowerCase() === 'reset' || rawText === 'RESTART_FLOW') {
             await prisma.session.deleteMany({ where: { userId: user.id } });
             
             if (user.kycStatus === 'VERIFIED') {
                 await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Home:* Your session has been reset. You've brought back to the main menu. Say 'Hi' to continue.");
             } else {
                 await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING' } });
-                await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Session Reset:* Flow refreshed. Please provide your **Full Legal Name** as it appears on your ID/BVN to restart:");
+                await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Onboarding Restarted:* All previous steps cleared. Please provide your **Full Legal Name** as it appears on your ID/BVN to begin again:");
             }
             return;
         }
@@ -177,6 +177,7 @@ export class WebhookController {
                 const welcomeMenu = [
                     { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
                     { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
+                    { id: "RESTART_FLOW", title: "🔄 Start Afresh", description: "Wipe progress and restart onboarding" },
                     { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
                 ];
                 try {
