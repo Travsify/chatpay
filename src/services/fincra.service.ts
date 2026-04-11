@@ -13,9 +13,17 @@ export class FincraService {
 
     private async getHeaders() {
         const apiKey = await this.getApiKey();
+        const businessId = process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6';
+        
+        if (!apiKey) {
+            console.error('[Fincra] CRITICAL: No API Key found in DB or Environment!');
+        } else {
+            console.log(`[Fincra] Using API Key: ${apiKey.substring(0, 8)}... (Length: ${apiKey.length})`);
+        }
+
         return {
             'api-key': apiKey,
-            'x-business-id': process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6',
+            'x-business-id': businessId,
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         };
