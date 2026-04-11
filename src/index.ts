@@ -10,10 +10,43 @@ import { AdminController } from './controllers/admin.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
 import { authMiddleware, requireRole } from './middleware/auth.middleware.js';
 import prisma from './utils/prisma.js';
+import { whapiService } from './services/whapi.service.js';
 
 const app = express();
 app.use(cors());
+
+// Health Check
+app.get('/', (req, res) => {
+    res.send('<h1>ChatPay Server is Live 🚀</h1><p>Status: Healthy | Database: Connected</p>');
+});
+
+// Serve frontend in production
+const frontendPath = path.join(process.cwd(), 'frontend', 'dist');
+if (fs.existsSync(frontendPath)) {
+    app.use(express.static(frontendPath));
+    app.get('*', (req, res) => {
+        if (!req.path.startsWith('/api') && !req.path.startsWith('/webhook')) {
+            res.sendFile(path.join(frontendPath, 'index.html'));
+        }
+    });
+}
+
 const PORT = process.env.PORT || 3000;
+app.listen(PORT, async () => {
+    console.log(`[ChatPay] Server running on port ${PORT}`);
+    
+    // Auto-sync webhook on start
+    try {
+        const renderUrl = process.env.RENDER_EXTERNAL_URL;
+        if (renderUrl) {
+            const webhookUrl = `${renderUrl}/webhook/whatsapp`;
+            await whapiService.registerWebhook(webhookUrl);
+            console.log(`[ChatPay] Webhook Auto-Synced: ${webhookUrl}`);
+        }
+    } catch (e) {
+        console.error('[ChatPay] Webhook Sync Failed on Start');
+    }
+});
 
 app.use(bodyParser.json());
 
