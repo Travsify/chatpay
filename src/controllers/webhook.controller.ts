@@ -112,8 +112,11 @@ export class WebhookController {
 
         // 0. New User Global Entry & Proactive Greeting
         if (!user.name && user.kycStatus === 'PENDING' && session.currentState === 'START') {
-            const welcomeMsg = `✨ *Welcome to ChatPay!* ✨\n\nYour autonomous financial companion natively inside WhatsApp.\n\n*What I can do for you:*\n🏦 *Virtual Accounts*: Nigerian bank details in seconds.\n🚀 *Transfers*: Swift payments to any bank.\n💡 *Bills*: Airtime & Utilities.\n₿ *Crypto*: Trade assets instantly.\n\nTo get started with your secure wallet, please tell me your *Full Name*:`;
-            await sendAndLog(welcomeMsg, 'WELCOME_ONBOARDING');
+            const welcomeMsg = `✨ *Welcome to ChatPay: Your Global Autonomous Bank* ✨\n\nYour finances, now natively on WhatsApp. Experience 24/7 autonomous banking.\n\nTo begin, please select an action or provide your *Full Name*:`;
+            await whapiService.sendList(phoneNumber, welcomeMsg, "Open Menu", [
+                { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your NGN/USD banking details" },
+                { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See what ChatPay can do" }
+            ]);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
             return;
         }
