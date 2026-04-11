@@ -106,23 +106,6 @@ export class WebhookController {
         let rawText = rawInput;
         const context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
 
-        // ===== UX: NUMBER-BASED MENU SELECTION =====
-        if (/^\d+$/.test(rawText) && context.lastMenuOptions) {
-            const index = parseInt(rawText) - 1;
-            if (index >= 0 && index < context.lastMenuOptions.length) {
-                const mappedId = context.lastMenuOptions[index].id;
-                console.log(`[UX] Mapping number "${rawText}" to menu ID: ${mappedId} for user ${phoneNumber}`);
-                rawText = mappedId;
-            }
-        }
-
-        // ===== SECURITY: KYC GATEWAY =====
-        const bankingCommands = ['CHECK_BALANCE', 'FUND_WALLET', 'SEND_MONEY', 'PAY_BILLS', 'CARD_MENU', 'ASSET_TRADING', 'GLOBAL_ACCOUNTS', 'GLOBAL_WALLETS'];
-        if (bankingCommands.includes(rawText) && user.kycStatus !== 'VERIFIED') {
-            await sendAndLog(`🔐 *Security Guard:* You must complete your account activation before accessing banking features.`, 'KYC_REQUIRED');
-            return WebhookController.processLogic(user, session, aiResult, 'MENU');
-        }
-
         // Helper to send + log outbound messages (Hybrid Text/Voice)
         const sendAndLog = async (message: string, intent?: string) => {
             if (isAudio) {
@@ -146,6 +129,23 @@ export class WebhookController {
             });
             await WebhookController.logWebhook('OUTBOUND', phoneNumber, JSON.stringify({ body: message }), 'PROCESSED');
         };
+
+        // ===== UX: NUMBER-BASED MENU SELECTION =====
+        if (/^\d+$/.test(rawText) && context.lastMenuOptions) {
+            const index = parseInt(rawText) - 1;
+            if (index >= 0 && index < context.lastMenuOptions.length) {
+                const mappedId = context.lastMenuOptions[index].id;
+                console.log(`[UX] Mapping number "${rawText}" to menu ID: ${mappedId} for user ${phoneNumber}`);
+                rawText = mappedId;
+            }
+        }
+
+        // ===== SECURITY: KYC GATEWAY =====
+        const bankingCommands = ['CHECK_BALANCE', 'FUND_WALLET', 'SEND_MONEY', 'PAY_BILLS', 'CARD_MENU', 'ASSET_TRADING', 'GLOBAL_ACCOUNTS', 'GLOBAL_WALLETS'];
+        if (bankingCommands.includes(rawText) && user.kycStatus !== 'VERIFIED') {
+            await sendAndLog(`🔐 *Security Guard:* You must complete your account activation before accessing banking features.`, 'KYC_REQUIRED');
+            return WebhookController.processLogic(user, session, aiResult, 'MENU');
+        }
 
         // 0. Global Priority Commands (Reset, Menu, Help)
         if (rawText === 'SYSTEM_CALL_REJECTED') {
