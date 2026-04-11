@@ -162,8 +162,6 @@ export class WebhookController {
             return;
         }
 
-        const context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
-        
         if (rawText === 'BACK' && context.previousState) {
             await prisma.session.update({ 
                 where: { id: session.id }, 
@@ -244,7 +242,6 @@ export class WebhookController {
         }
 
         if (session.currentState === 'AWAITING_KYC') {
-            const context = JSON.parse(String(session.context || '{}'));
             const isBusiness = context.type === 'business';
             
             await sendAndLog(`Verifying your ${isBusiness ? 'business' : 'identity'} details... ⏳`, 'KYC_FLOW');
@@ -278,7 +275,6 @@ export class WebhookController {
         }
 
         if (session.currentState === 'AWAITING_TRANSFER_CONFIRM') {
-            const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
             const { amount, recipient } = context as any;
             
             if (rawText.toLowerCase().includes('yes') || rawText === 'CONFIRM_TX') {
@@ -316,7 +312,6 @@ export class WebhookController {
 
         if (session.currentState === 'AWAITING_PIN_VERIFY') {
             if (rawText.trim() === user.transactionPin) {
-                const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
                 const { amount, recipient, billType, customer } = context as any;
                 
                 const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
@@ -348,7 +343,6 @@ export class WebhookController {
         }
 
         if (session.currentState === 'AWAITING_BILL_CONFIRM') {
-            const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
             const { amount, billType } = context as any;
             
             if (rawText.toLowerCase().includes('yes') || rawText === 'CONFIRM_BILL') {
