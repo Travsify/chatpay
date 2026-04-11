@@ -36,10 +36,16 @@ export class AdminController {
             const allowedFields = ['whatsappNumber', 'premblySecret', 'openaiKey', 'fincraSecret', 'flutterwaveSecret', 'whapiToken', 'whapiApiUrl', 'whapiWebhookUrl', 'quidaxSecret', 'prestmitSecret', 'feePercentage', 'flatFee', 'usdExchangeRate', 'usdMarkup', 'dailyLimit', 'eurMarkup', 'gbpMarkup', 'cryptoMarkupPerc', 'giftcardMarkupPerc', 'cardIssuanceFee', 'cardFundingMarkup'];
             const updateData: any = {};
             
+            const numericFields = ['feePercentage', 'flatFee', 'usdExchangeRate', 'usdMarkup', 'dailyLimit', 'eurMarkup', 'gbpMarkup', 'cryptoMarkupPerc', 'giftcardMarkupPerc', 'cardIssuanceFee', 'cardFundingMarkup'];
+            
             allowedFields.forEach(field => {
                 if (req.body[field] !== undefined) {
-                    const value = req.body[field];
-                    updateData[field] = (typeof value === 'string') ? value.trim() : value;
+                    let value = req.body[field];
+                    if (numericFields.includes(field)) {
+                        updateData[field] = parseFloat(String(value)) || 0;
+                    } else {
+                        updateData[field] = (typeof value === 'string') ? value.trim() : value;
+                    }
                 }
             });
 
