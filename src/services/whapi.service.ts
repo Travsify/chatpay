@@ -18,7 +18,7 @@ export class WhapiService {
                 return config.whapiToken;
             }
         } catch (e) {
-            console.error('[Whapi] Failed to fetch token from DB, falling back to ENV');
+            console.error('[Whapi] Failed to fetch token from DB');
         }
 
         // PRIORITY 2: Fallback to Environment Variable
@@ -26,7 +26,8 @@ export class WhapiService {
             return this.token;
         }
 
-        return '';
+        // PRIORITY 3: Emergency Hardcoded Fallback (for immediate activation)
+        return 'dpbmczIIkfqHDHq509phi7CA8w3RDK5A';
     }
 
     async sendMessage(to: string, body: string) {
