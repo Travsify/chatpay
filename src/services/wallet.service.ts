@@ -3,34 +3,38 @@ import prisma from '../utils/prisma.js';
 
 export class WalletService {
     
-    static async setupUserWallet(userId: string, type: 'individual' | 'business' = 'individual', businessName?: string) {
+    static async setupUserWallet(userId: string, type: 'individual' | 'business' = 'individual', businessName?: string, currency: string = 'NGN') {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) return;
 
         try {
-            // 1. Create Fincra Customer
-            const names = (user.name || 'ChatPay User').split(' ');
-            const customer = await fincraService.createCustomer({
-                firstName: type === 'business' ? (businessName || names[0]) : names[0],
-                lastName: type === 'business' ? 'Enterprise' : (names[1] || 'User'),
-                email: `${user.phoneNumber}@chatpay.io`,
-                phoneNumber: user.phoneNumber,
-                type: type
-            });
+            // 1. Get or Create Fincra Customer
+            let customerId = user.fincraCustomerId;
+            if (!customerId) {
+                const names = (user.name || 'ChatPay User').split(' ');
+                const customer = await fincraService.createCustomer({
+                    firstName: type === 'business' ? (businessName || names[0]) : names[0],
+                    lastName: type === 'business' ? 'Enterprise' : (names[1] || 'User'),
+                    email: `${user.phoneNumber}@chatpay.io`,
+                    phoneNumber: user.phoneNumber,
+                    type: type
+                });
+                customerId = customer.data.id;
+            }
 
-            // 2. Create Virtual Account
+            // 2. Create Virtual Account with requested currency
             const virtualAccount = await fincraService.createVirtualAccount({
-                currency: 'NGN',
+                currency: currency,
                 accountType: 'default',
-                customerId: customer.data.id
+                customerId: customerId!
             });
 
-            // 3. Update User in DB
+            // 3. Update User in DB (Save NGN wallet as primary if it's the first time)
             await prisma.user.update({
                 where: { id: userId },
                 data: {
-                    fincraCustomerId: customer.data.id,
-                    fincraWalletId: virtualAccount.data.accountNumber || 'PENDING'
+                    fincraCustomerId: customerId,
+                    fincraWalletId: currency === 'NGN' ? (virtualAccount.data.accountNumber || 'PENDING') : user.fincraWalletId
                 }
             });
 

@@ -1178,47 +1178,77 @@ const ApiVault = ({ api }: { api: any }) => {
           />
         </div>
 
-        {/* Financial Rules */}
+        {/* Financial Rules & Granular Markups */}
         <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
-          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
-            <TrendingUp size={14} className="text-[#FFD700]" /> Financial Rules & Markups
+          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#222d34] pb-2">
+            <TrendingUp size={14} className="text-[#FFD700]" /> Financial Rules & Granular Markups
           </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-             <div>
-                <p className="text-[9px] text-[#8696a0] mb-1 italic">Flat Fee (₦)</p>
-                <input
-                  type="number" name="flatFee" value={config.flatFee} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none"
-                />
-             </div>
-             <div>
-                <p className="text-[9px] text-[#8696a0] mb-1 italic">Fee Percentage (%)</p>
-                <input
-                  type="number" step="0.1" name="feePercentage" value={config.feePercentage} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none"
-                />
-             </div>
-             <div>
-                <p className="text-[9px] text-[#8696a0] mb-1 italic">USD Rate (₦)</p>
-                <input
-                  type="number" name="usdExchangeRate" value={config.usdExchangeRate} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none"
-                />
-             </div>
-             <div>
-                <p className="text-[9px] text-[#8696a0] mb-1 italic">USD Markup (₦)</p>
-                <input
-                  type="number" name="usdMarkup" value={config.usdMarkup} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none"
-                />
-             </div>
-             <div>
-                <p className="text-[9px] text-[#8696a0] mb-1 italic">Daily Limit (₦)</p>
-                <input
-                  type="number" name="dailyLimit" value={config.dailyLimit} onChange={handleChange}
-                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none"
-                />
-             </div>
+          
+          <div className="space-y-6">
+            {/* Fiat Markups */}
+            <div>
+              <p className="text-[10px] font-bold text-[#FFD700]/70 uppercase tracking-tighter mb-3">Fiat Profit Spreads (₦)</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">USD Rate (Base)</p>
+                   <input type="number" name="usdExchangeRate" value={config.usdExchangeRate} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">USD Markup</p>
+                   <input type="number" name="usdMarkup" value={config.usdMarkup} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">EUR Markup</p>
+                   <input type="number" name="eurMarkup" value={config.eurMarkup} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">GBP Markup</p>
+                   <input type="number" name="gbpMarkup" value={config.gbpMarkup} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Asset Markups */}
+            <div>
+              <p className="text-[10px] font-bold text-[#FFD700]/70 uppercase tracking-tighter mb-3">Asset & Service Fees (%)</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Crypto Markup (%)</p>
+                   <input type="number" step="0.1" name="cryptoMarkupPerc" value={config.cryptoMarkupPerc} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Giftcard Markup (%)</p>
+                   <input type="number" step="0.1" name="giftcardMarkupPerc" value={config.giftcardMarkupPerc} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Flat Tx Fee (₦)</p>
+                   <input type="number" name="flatFee" value={config.flatFee} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Perc Tx Fee (%)</p>
+                   <input type="number" step="0.1" name="feePercentage" value={config.feePercentage} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+              </div>
+            </div>
+
+            {/* Card Program */}
+            <div>
+              <p className="text-[10px] font-bold text-[#FFD700]/70 uppercase tracking-tighter mb-3">Virtual Card Program</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Issuance Fee (₦)</p>
+                   <input type="number" name="cardIssuanceFee" value={config.cardIssuanceFee} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Funding Markup (₦/$)</p>
+                   <input type="number" name="cardFundingMarkup" value={config.cardFundingMarkup} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+                <div>
+                   <p className="text-[9px] text-[#8696a0] mb-1 italic">Daily Limit (₦)</p>
+                   <input type="number" name="dailyLimit" value={config.dailyLimit} onChange={handleChange} className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#FFD700] focus:outline-none" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

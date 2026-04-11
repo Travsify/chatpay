@@ -377,6 +377,23 @@ export class WebhookController {
                     }
                 }
                 break;
+            case 'OPEN_ACCOUNT':
+                if (user.kycStatus !== 'VERIFIED') {
+                    await sendAndLog(`Verify your account first to open global currency wallets.`, 'UNVERIFIED_ATTEMPT');
+                } else {
+                    const { currency } = aiResult.entities || {};
+                    const targetCurrency = (currency || 'USD').toUpperCase();
+                    await sendAndLog(`Generating your *${targetCurrency}* Virtual Account... 🏦 ⏳`, 'ACCOUNT_START');
+                    try {
+                        const account = await WalletService.setupUserWallet(user.id, 'individual', undefined, targetCurrency);
+                        const accountMsg = `🎉 *Your ${targetCurrency} Account is Live!* 🌍\n\n*Account Number*: ${account?.accountNumber || 'Pending'}\n*Bank*: WEMA BANK (ChatPay)\n*Currency*: ${targetCurrency}\n*Account Name*: ${user.name}\n\nFund this account to start transacting globally!`;
+                        await sendAndLog(accountMsg, 'ACCOUNT_CREATED');
+                    } catch (e: any) {
+                        await sendAndLog(`Account creation failed: ${e.message}`, 'ACCOUNT_FAILED');
+                    }
+                }
+                break;
+
             case 'UNKNOWN':
             default:
                 const response = await aiService.generateResponse(`User: "${rawText}". Respond as ChatPay bot — a WhatsApp banking assistant. Keep response concise and helpful.`);

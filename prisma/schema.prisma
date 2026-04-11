@@ -117,12 +117,22 @@ model SystemConfig {
   quidaxSecret      String?
   prestmitSecret    String?
   
-  // Financial Rules
+  // Financial Rules & Granular Markups
   feePercentage     Float    @default(0.5)
   flatFee           Float    @default(50.0)
+  dailyLimit        Float    @default(500000.0)
+  
+  // Fiat Markups
   usdExchangeRate   Float    @default(1500.0)
   usdMarkup         Float    @default(50.0)
-  dailyLimit        Float    @default(500000.0)
+  eurMarkup         Float    @default(60.0)
+  gbpMarkup         Float    @default(80.0)
+  
+  // Asset Markups
+  cryptoMarkupPerc  Float    @default(2.0)  // 2% markup on Quidax rates
+  giftcardMarkupPerc Float   @default(5.0)  // 5% markup on PressMnt rates
+  cardIssuanceFee   Float    @default(1500.0) // ₦1,500 startup fee for cards
+  cardFundingMarkup Float    @default(20.0)   // ₦20 per dollar markup for funding cards
   
   updatedAt         DateTime @updatedAt
 }
