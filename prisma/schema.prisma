@@ -112,6 +112,7 @@ model SystemConfig {
   flutterwaveSecret String?
   whapiToken        String?
   whapiApiUrl       String?
+  whapiWebhookUrl   String?
   quidaxSecret      String?
   prestmitSecret    String?
   updatedAt         DateTime @updatedAt

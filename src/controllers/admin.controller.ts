@@ -58,7 +58,12 @@ export class AdminController {
 
     static async syncWhapiWebhook(req: AuthRequest, res: Response) {
         try {
-            const webhookUrl = 'https://chatpay-l4ej.onrender.com/webhook/whatsapp';
+            const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            
+            // PRIORITY: Database URL (from Vault) -> Environment -> Hardcoded Default
+            const webhookUrl = config?.whapiApiUrl || process.env.WHAPI_WEBHOOK_URL || 'https://chatpay-l4ej.onrender.com/webhook/whatsapp';
+            
+            console.log(`[Admin] Synchronizing webhook to: ${webhookUrl}`);
             const result = await whapiService.registerWebhook(webhookUrl);
             res.json({ message: 'Webhook synchronized with Whapi.cloud', result });
         } catch (error: any) {
