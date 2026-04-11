@@ -139,8 +139,13 @@ export class WebhookController {
         
         if (rawText.toLowerCase() === 'reset') {
             await prisma.session.deleteMany({ where: { userId: user.id } });
-            await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING' } });
-            await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Session Reset:* Your vault has been refreshed. Say 'Hi' to restart.");
+            
+            if (user.kycStatus === 'VERIFIED') {
+                await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Home:* Your session has been reset. You've brought back to the main menu. Say 'Hi' to continue.");
+            } else {
+                await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING' } });
+                await whapiService.sendMessage(phoneNumber, "✨ *ChatPay Session Reset:* Flow refreshed. Please provide your **Full Legal Name** as it appears on your ID/BVN to restart:");
+            }
             return;
         }
 
@@ -400,15 +405,28 @@ export class WebhookController {
         }
 
         if (rawText === 'GLOBAL_ACCOUNTS' || rawText === 'REFRESH' && session.currentState === 'GLOBAL_ACCOUNTS') {
-            const globalTxt = `🌍 *Global Wallets*\n\nExpand your financial reach:`;
+            const emailStatus = user.email ? `✅ *Archiving Active*: ${user.email}` : `❌ *Archiving Inactive*: No email linked.`;
+            const securityStatus = `🔒 *Session Guard*: Active (10-min timeout)\n${emailStatus}`;
+            
+            const globalTxt = `🌍 *Global Wallets & Security*\n\n${securityStatus}\n\nExpand your financial reach and secure your records:`;
             await whapiService.sendList(phoneNumber, globalTxt, "Global Services", [
                 { id: "OPEN_ACCOUNT_USD", title: "🇺🇸 Open USD Account", description: "Get US Banking details" },
                 { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Fund GBP Account", description: "Get UK Banking details" },
-                { id: "SET_EMAIL", title: "📧 Secure Archiving", description: "Send receipts to your email" },
+                { id: "SET_EMAIL", title: user.email ? "📧 Update Archive Email" : "📧 Link Archive Email", description: "Save receipts & invoices to email" },
+                { id: "SECURITY_INFO", title: "🔒 Security Overview", description: "How we protect your vault" },
                 { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'GLOBAL_ACCOUNTS', context: JSON.stringify({ ...context, previousState: 'START' }) }});
+            return;
+        }
+
+        if (rawText === 'SECURITY_INFO') {
+            const info = `🛡️ *ChatPay Security Architecture*\n\n1. *10-Min Session Guard*: If inactive for 10 mins, you must re-enter your PIN to unlock banking.\n2. *External Archiving*: Link your email to receive PDF receipts & invoices outside of WhatsApp.\n3. *Device Privacy*: We recommend enabling "Ephemeral Messages" in your Chat Settings for extra security.\n4. *Encryption*: All bank-grade data is encrypted on our secure AWS cloud.`;
+            await whapiService.sendButtons(phoneNumber, info, [
+                { id: "GLOBAL_ACCOUNTS", title: "🔙 Back" },
+                { id: "HOME", title: "🏠 Home" }
+            ]);
             return;
         }
 
