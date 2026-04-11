@@ -4,9 +4,7 @@ import prisma from '../utils/prisma.js';
 export class MapleradService {
     private async getSecretKey() {
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-        // Using prestmitSecret field temporarily if mapleradSecret doesn't exist yet, 
-        // but we'll use a dynamic approach.
-        return config?.prestmitSecret || process.env.MAPLERAD_SECRET_KEY;
+        return config?.mapleradSecret || process.env.MAPLERAD_SECRET_KEY;
     }
 
     async createVirtualCard(userId: string, currency: 'USD' | 'NGN' = 'USD', amount: number) {

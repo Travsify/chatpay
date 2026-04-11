@@ -1319,8 +1319,8 @@ const ApiVault = ({ api }: { api: any }) => {
           </div>
         </div>
 
-        {/* Quidax & Prestmit */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Quidax & Prestmit & Maplerad */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
             <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
               <Database size={14} className="text-blue-400" /> Quidax
@@ -1347,6 +1347,21 @@ const ApiVault = ({ api }: { api: any }) => {
               />
               <button type="button" onClick={() => toggleVisibility('prestmitSecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
                   {visibleKeys.prestmitSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+            <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+              <Shield size={14} className="text-purple-400" /> Maplerad
+            </label>
+            <div className="relative">
+              <input
+                type={visibleKeys.mapleradSecret ? "text" : "password"} name="mapleradSecret" value={config.mapleradSecret || ''} onChange={handleChange}
+                className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
+              />
+              <button type="button" onClick={() => toggleVisibility('mapleradSecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                  {visibleKeys.mapleradSecret ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>

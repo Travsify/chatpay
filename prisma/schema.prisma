@@ -118,6 +118,7 @@ model SystemConfig {
   whapiWebhookUrl   String?
   quidaxSecret      String?
   prestmitSecret    String?
+  mapleradSecret    String?
   
   // Financial Rules & Granular Markups
   feePercentage     Float    @default(0.5)
