@@ -4,7 +4,7 @@ import { aiService } from '../services/ai.service.js';
 import { WalletService } from '../services/wallet.service.js';
 import { FlutterwaveService } from '../services/flutterwave.service.js';
 import { quidaxService } from '../services/quidax.service.js';
-import { mapleradService } from '../services/maplerad.service.ts';
+import { mapleradService } from '../services/maplerad.service.js';
 import { pressMntService } from '../services/pressmnt.service.js';
 import prisma from '../utils/prisma.js';
 

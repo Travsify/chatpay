@@ -2,12 +2,12 @@ import axios from 'axios';
 import prisma from '../utils/prisma.js';
 
 export class PressMntService {
-    private static async getSecretKey() {
+    private async getSecretKey() {
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
         return config?.premblySecret || process.env.PRESSMNT_SECRET_KEY;
     }
 
-    static async getGiftCardRates() {
+    async getGiftCardRates() {
         return [
             { name: 'Amazon USD', rate: '₦1,250/$', type: 'REDEMPTION' },
             { name: 'iTunes/Apple', rate: '₦1,100/$', type: 'REDEMPTION' },
@@ -15,7 +15,7 @@ export class PressMntService {
         ];
     }
 
-    static async sellGiftCard(userId: string, cardType: string, amount: number, code: string) {
+    async sellGiftCard(userId: string, cardType: string, amount: number, code: string) {
         try {
             const secretKey = await this.getSecretKey();
             if (!secretKey) throw new Error('PressMnt Secret Key not configured');

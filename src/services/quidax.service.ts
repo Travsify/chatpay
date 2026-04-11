@@ -2,12 +2,12 @@ import axios from 'axios';
 import prisma from '../utils/prisma.js';
 
 export class QuidaxService {
-    private static async getSecretKey() {
+    private async getSecretKey() {
         const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
         return config?.quidaxSecret || process.env.QUIDAX_SECRET_KEY;
     }
 
-    static async buyCrypto(userId: string, asset: string, amountUsd: number) {
+    async buyCrypto(userId: string, asset: string, amountUsd: number) {
         try {
             const secretKey = await this.getSecretKey();
             if (!secretKey) throw new Error('Quidax Secret Key not configured');
@@ -32,7 +32,7 @@ export class QuidaxService {
         }
     }
 
-    static async getAssetPrices() {
+    async getAssetPrices() {
         // Mocking for now to avoid consuming quotas, but wired for production
         return {
             btc: '₦105,250,000',
