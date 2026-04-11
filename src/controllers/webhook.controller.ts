@@ -189,11 +189,11 @@ export class WebhookController {
             if (rawText !== 'REFRESH') {
                 await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
             }
-            await whapiService.sendList(phoneNumber, `Thanks ${user.name || 'there'}! 🤝 Is this account for yourself or a business?`, "Select Type", [
-                { id: "TYPE_INDIVIDUAL", title: "👤 Individual", description: "For personal usage" },
-                { id: "TYPE_BUSINESS", title: "💼 Business", description: "For company usage" },
-                { id: "HOME", title: "🔙 Home", description: "Restart" }
-            ]);
+            await whapiService.sendButtons(phoneNumber, `Thanks ${user.name || 'there'}! 🤝 Is this account for yourself or a business?`, [
+                { id: "TYPE_INDIVIDUAL", title: "👤 Individual" },
+                { id: "TYPE_BUSINESS", title: "💼 Business" },
+                { id: "HOME", title: "🏠 Home" }
+            ], "Tap an option to proceed.");
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE', context: JSON.stringify({ ...context, previousState: 'AWAITING_NAME' }) } });
             return;
         }
@@ -257,7 +257,9 @@ export class WebhookController {
 
         if (session.currentState === 'AWAITING_TRANSFER_CONFIRM') {
             const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
-            if (rawText.toLowerCase().includes('yes') || rawText.toLowerCase().includes('confirm')) {
+            const { amount, recipient } = context as any;
+            
+            if (rawText.toLowerCase().includes('yes') || rawText === 'CONFIRM_TX') {
                 if (!user.transactionPin) {
                     await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to secure your account and authorize payments:`, 'PIN_SETUP_START');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
@@ -265,9 +267,15 @@ export class WebhookController {
                     await sendAndLog(`Please enter your *4-digit PIN* to authorize this transaction:`, 'PIN_VERIFY_REQUEST');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
                 }
-            } else if (rawText === 'BACK' || rawText.toLowerCase().includes('no')) {
+            } else if (rawText === 'BACK' || rawText === 'CANCEL_TX' || rawText.toLowerCase().includes('no')) {
                 await sendAndLog(`Transaction cancelled. ❌`, 'TRANSFER_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+            } else if (rawText === 'REFRESH') {
+                await whapiService.sendButtons(phoneNumber, `Send ₦${amount} to ${recipient}? 💸`, [
+                    { id: "CONFIRM_TX", title: "✅ Yes, Send" },
+                    { id: "CANCEL_TX", title: "❌ No, Cancel" },
+                    { id: "HOME", title: "🏠 Home" }
+                ]);
             }
             return;
         }
@@ -317,7 +325,9 @@ export class WebhookController {
 
         if (session.currentState === 'AWAITING_BILL_CONFIRM') {
             const context = typeof session.context === 'string' ? JSON.parse(session.context) : session.context;
-            if (rawText.toLowerCase().includes('yes') || rawText.toLowerCase().includes('confirm')) {
+            const { amount, billType } = context as any;
+            
+            if (rawText.toLowerCase().includes('yes') || rawText === 'CONFIRM_BILL') {
                 if (!user.transactionPin) {
                     await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to authorize your payment:`, 'PIN_SETUP_START');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
@@ -325,9 +335,15 @@ export class WebhookController {
                     await sendAndLog(`Please enter your *4-digit PIN* to authorize this bill payment:`, 'PIN_VERIFY_REQUEST');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
                 }
-            } else {
+            } else if (rawText === 'CANCEL_BILL' || rawText.toLowerCase().includes('no')) {
                 await sendAndLog(`Payment cancelled. ❌`, 'BILL_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+            } else if (rawText === 'REFRESH') {
+                await whapiService.sendButtons(phoneNumber, `Pay ₦${amount} for ${billType}? 💡`, [
+                    { id: "CONFIRM_BILL", title: "✅ Yes, Pay" },
+                    { id: "CANCEL_BILL", title: "❌ No, Cancel" },
+                    { id: "HOME", title: "🏠 Home" }
+                ]);
             }
             return;
         }
@@ -435,10 +451,14 @@ export class WebhookController {
                     if (!amount || !recipient) {
                         await sendAndLog(`Please specify amount and recipient.`, 'MISSING_ENTITIES');
                     } else {
-                        await sendAndLog(`Send ₦${amount} to ${recipient}? (Yes/No)`, 'TRANSFER_CONFIRM');
+                        await whapiService.sendButtons(phoneNumber, `Confirm: Send ₦${amount} to ${recipient}? 💸`, [
+                            { id: "CONFIRM_TX", title: "✅ Yes, Send" },
+                            { id: "CANCEL_TX", title: "❌ No, Cancel" },
+                            { id: "HOME", title: "🏠 Home" }
+                        ]);
                         await prisma.session.update({
                             where: { id: session.id },
-                            data: { currentState: 'AWAITING_TRANSFER_CONFIRM', context: JSON.stringify({ amount, recipient }) }
+                            data: { currentState: 'AWAITING_TRANSFER_CONFIRM', context: JSON.stringify({ ...context, amount, recipient, previousState: 'START' }) }
                         });
                     }
                 }
@@ -470,7 +490,12 @@ export class WebhookController {
                     if (isPending) {
                         await sendAndLog(`Your virtual account is still being generated by the bank... ⏳ Please try again in 60 seconds.`, 'BALANCE_PENDING');
                     } else {
-                        await sendAndLog(`💰 Your ChatPay Balance:\n₦${balance.toLocaleString()}\n\nAccount: ${user.fincraWalletId}\nBank: WEMA BANK (ChatPay)`, 'BALANCE_CHECK');
+                        const balMsg = `💰 *Your ChatPay Balance*:\n₦${balance.toLocaleString()}\n\n*Account*: ${user.fincraWalletId}\n*Bank*: WEMA BANK (ChatPay)`;
+                        await whapiService.sendButtons(phoneNumber, balMsg, [
+                            { id: "SEND_MONEY_FLOW", title: "💸 Send Money" },
+                            { id: "PAY_BILLS", title: "💡 Pay Bills" },
+                            { id: "HOME", title: "🏠 Home" }
+                        ]);
                     }
                 }
                 break;
@@ -485,12 +510,16 @@ export class WebhookController {
                     if (!amount || !billType) {
                         await sendAndLog(`Please specify the amount and what you want to pay for (e.g. Airtime, DSTV).`, 'MISSING_ENTITIES');
                     } else {
-                        await sendAndLog(`Confirm paying ₦${amount} for *${billType}* to ${targetCustomer}? (Yes/No)`, 'BILL_CONFIRM');
+                        await whapiService.sendButtons(phoneNumber, `Confirm: Pay ₦${amount} for *${billType}* to ${targetCustomer}? 💡`, [
+                            { id: "CONFIRM_BILL", title: "✅ Yes, Pay" },
+                            { id: "CANCEL_BILL", title: "❌ No, Cancel" },
+                            { id: "HOME", title: "🏠 Home" }
+                        ]);
                         await prisma.session.update({
                             where: { id: session.id },
                             data: { 
                                 currentState: 'AWAITING_BILL_CONFIRM', 
-                                context: JSON.stringify({ amount, billType, customer: targetCustomer }) 
+                                context: JSON.stringify({ ...context, amount, billType, customer: targetCustomer, previousState: 'START' }) 
                             }
                         });
                     }

@@ -215,6 +215,41 @@ export class WhapiService {
         }
     }
 
+    async sendButtons(to: string, text: string, buttons: { id: string; title: string }[], footer?: string) {
+        const token = await this.getToken();
+        const apiUrl = await this.getUrl();
+        let cleanTo = to.replace(/\D/g, '');
+        if (!cleanTo.includes('@')) cleanTo += '@s.whatsapp.net';
+
+        try {
+            const response = await axios.post(`${apiUrl}/messages/interactive`, {
+                to: cleanTo,
+                body: { text: text },
+                footer: footer ? { text: footer } : undefined,
+                action: {
+                    buttons: buttons.map(b => ({
+                        type: 'reply',
+                        reply: { id: b.id, title: b.title }
+                    }))
+                }
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Whapi] Button send failed, falling back to text:', error.response?.data || error.message);
+            let fallbackText = `${text}\n\n`;
+            buttons.forEach(b => {
+                fallbackText += `• *${b.title}*\n`;
+            });
+            if (footer) fallbackText += `\n_${footer}_`;
+            return await this.sendMessage(cleanTo, fallbackText);
+        }
+    }
+
     async getChannelHealth() {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
