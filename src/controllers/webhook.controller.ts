@@ -101,8 +101,21 @@ export class WebhookController {
         }
     }
 
-    private static async processLogic(user: any, session: any, aiResult: any, rawText: string, isAudio: boolean = false) {
+    private static async processLogic(user: any, session: any, aiResult: any, rawInput: string, isAudio: boolean = false) {
         const { phoneNumber } = user;
+        let rawText = rawInput;
+        const context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
+
+        // ===== UX: NUMBER-BASED MENU SELECTION =====
+        // If the user typed a single number, try to map it to the last sent menu options
+        if (/^\d+$/.test(rawText) && context.lastMenuOptions) {
+            const index = parseInt(rawText) - 1;
+            if (index >= 0 && index < context.lastMenuOptions.length) {
+                const mappedId = context.lastMenuOptions[index].id;
+                console.log(`[UX] Mapping number "${rawText}" to menu ID: ${mappedId}`);
+                rawText = mappedId;
+            }
+        }
 
         // Helper to send + log outbound messages (Hybrid Text/Voice)
         const sendAndLog = async (message: string, intent?: string) => {
@@ -163,29 +176,31 @@ export class WebhookController {
         if (isMenu || (isHi && session.currentState === 'START')) {
             if (!user.name || user.kycStatus !== 'VERIFIED') {
                 const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, what is your FULL LEGAL NAME?*\n\n⚠️ *Note*: Use the exact name on your **BVN or ID Card** to avoid bank verification errors.`;
+                const welcomeMenu = [
+                    { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
+                    { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
+                    { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
+                ];
                 try {
-                    await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", [
-                        { id: "START_ONBOARDING", title: "🏦 Open Account", description: "Get your global banking details" },
-                        { id: "HELP_MENU", title: "ℹ️ Service Overview", description: "See everything ChatPay can do" },
-                        { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
-                    ]);
+                    await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", welcomeMenu);
                 } catch (e) {
                     await whapiService.sendMessage(phoneNumber, welcomeMsg);
                 }
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME', context: JSON.stringify({ ...context, lastMenuOptions: welcomeMenu }) } });
             } else {
                 const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nHow can I help you manage your wealth today? Please select an option:`;
-                await whapiService.sendList(user.phoneNumber, menuTxt, "📱 Banking Menu", [
+                const mainMenu = [
                     { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your current funds" },
                     { id: "FUND_WALLET", title: "🏦 Fund Wallet", description: "Get your account numbers" },
-                    { id: "SEND_MONEY_FLOW", title: "💸 Send Money", description: "Transfer to any bank or user" },
+                    { id: "SEND_MONEY", title: "💸 Send Money", description: "Transfer to any bank or user" },
                     { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, Power, TV" },
                     { id: "CARD_MENU", title: "💳 Virtual Cards", description: "USD Master/Visa cards" },
                     { id: "ASSET_TRADING", title: "₿ Asset Trading", description: "Buy/Sell Crypto & Giftcards" },
                     { id: "GLOBAL_ACCOUNTS", title: "🌍 Global Wallets", description: "Open USD, GBP or EUR accounts" },
                     { id: "HOME", title: "🏠 Home", description: "Refresh this menu" }
-                ]);
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
+                ];
+                await whapiService.sendList(user.phoneNumber, menuTxt, "📱 Banking Menu", mainMenu);
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: mainMenu, previousState: null }) } });
             }
             return;
         }
@@ -195,12 +210,13 @@ export class WebhookController {
             if (rawText !== 'REFRESH') {
                 await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
             }
-            await whapiService.sendButtons(phoneNumber, `Thanks ${user.name || 'there'}! 🤝 Is this account for yourself or a business?`, [
+            const typeMenu = [
                 { id: "TYPE_INDIVIDUAL", title: "👤 Individual" },
                 { id: "TYPE_BUSINESS", title: "💼 Business" },
                 { id: "HOME", title: "🏠 Home" }
-            ], "Tap an option to proceed.");
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE', context: JSON.stringify({ ...context, previousState: 'AWAITING_NAME' }) } });
+            ];
+            await whapiService.sendButtons(phoneNumber, `Thanks ${user.name || 'there'}! 🤝 Is this account for yourself or a business?`, typeMenu, "Tap an option to proceed.");
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TYPE', context: JSON.stringify({ ...context, lastMenuOptions: typeMenu, previousState: 'AWAITING_NAME' }) } });
             return;
         }
 
@@ -358,14 +374,14 @@ export class WebhookController {
 
         // ===== MENU BUTTON HANDLERS =====
         if (rawText === 'FUND_WALLET' || rawText === 'REFRESH' && session.currentState === 'FUND_WALLET') {
-            const fundTxt = `🏦 *Fund Your Wallet*\n\nSelect the currency you'd like to fund:`;
-            await whapiService.sendList(phoneNumber, fundTxt, "Select Currency", [
+            const menu = [
                 { id: "FUND_NGN", title: "🇳🇬 Fund NGN", description: "Get your local bank details" },
                 { id: "FUND_USD", title: "🇺🇸 Fund USD", description: "Get your US banking details" },
                 { id: "FUND_GBP", title: "🇬🇧 Fund GBP", description: "Get your UK banking details" },
-                { id: "HOME", title: "🔙 Home", description: "Main menu" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'FUND_WALLET', context: JSON.stringify({ ...context, previousState: 'START' }) }});
+                { id: "HOME", title: "🏠 Home", description: "Main menu" }
+            ];
+            await whapiService.sendList(phoneNumber, `🏦 *Fund Your Wallet*\n\nSelect the currency you'd like to fund:`, "Select Currency", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'FUND_WALLET', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
 
@@ -393,67 +409,67 @@ export class WebhookController {
         }
 
         if (rawText === 'PAY_BILLS' || rawText === 'REFRESH' && session.currentState === 'PAY_BILLS') {
-            const billTxt = `💡 *Bill Payments & Utilities*\n\nSelect a category to pay for:`;
-            await whapiService.sendList(phoneNumber, billTxt, "Bill Categories", [
+            const menu = [
                 { id: "AIRTIME_MENU", title: "📱 Airtime", description: "Recharge your phone" },
                 { id: "DATA_MENU", title: "📶 Data Bundles", description: "Buy internet data" },
                 { id: "UTILITIES_MENU", title: "⚡ Utilities", description: "Electricity & Power" },
                 { id: "CABLE_TV_MENU", title: "📺 Cable TV", description: "DSTV, GOtv, Startimes" },
                 { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'PAY_BILLS', context: JSON.stringify({ ...context, previousState: 'START' }) }});
+            ];
+            await whapiService.sendList(phoneNumber, `💡 *Bill Payments & Utilities*\n\nSelect a category to pay for:`, "Bill Categories", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'PAY_BILLS', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
 
         if (rawText === 'AIRTIME_MENU') {
-            const msg = `📱 *Airtime Recharge*\n\nSelect your network provider:`;
-            await whapiService.sendList(phoneNumber, msg, "Network Providers", [
+            const menu = [
                 { id: "AIRTIME_MTN", title: "MTN Nigeria", description: "Yellow network" },
                 { id: "AIRTIME_GLO", title: "Glo Nigeria", description: "Grandmasters of data" },
                 { id: "AIRTIME_AIRTEL", title: "Airtel Nigeria", description: "Smartphone network" },
                 { id: "AIRTIME_9MOBILE", title: "9Mobile", description: "Etisalat evolution" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AIRTIME_MENU', context: JSON.stringify({ ...context, previousState: 'PAY_BILLS' }) }});
+            ];
+            await whapiService.sendList(phoneNumber, `📱 *Airtime Recharge*\n\nSelect your network provider:`, "Network Providers", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AIRTIME_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
 
         if (rawText === 'DATA_MENU') {
-            const msg = `📶 *Internet Data Bundles*\n\nSelect your network provider:`;
-            await whapiService.sendList(phoneNumber, msg, "Network Providers", [
+            const menu = [
                 { id: "DATA_MTN", title: "MTN Data", description: "Fast 5G/4G bundles" },
                 { id: "DATA_GLO", title: "Glo Data", description: "High volume data" },
                 { id: "DATA_AIRTEL", title: "Airtel Data", description: "Unlimited options" },
                 { id: "DATA_9MOBILE", title: "9Mobile Data", description: "Secure bundles" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'DATA_MENU', context: JSON.stringify({ ...context, previousState: 'PAY_BILLS' }) }});
+            ];
+            await whapiService.sendList(phoneNumber, `📶 *Internet Data Bundles*\n\nSelect your network provider:`, "Network Providers", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'DATA_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
 
         if (rawText === 'UTILITIES_MENU') {
-            const msg = `⚡ *Electricity & Utilities*\n\nSelect your distribution company (Disco):`;
-            await whapiService.sendList(phoneNumber, msg, "Power Companies", [
+            const menu = [
                 { id: "UTIL_EKEDC", title: "EKEDC", description: "Eko Electricity" },
                 { id: "UTIL_IKEDC", title: "IKEDC", description: "Ikeja Electricity" },
                 { id: "UTIL_AEDC", title: "AEDC", description: "Abuja Electricity" },
                 { id: "UTIL_PHEDC", title: "PHEDC", description: "Port Harcourt Electricity" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'UTILITIES_MENU', context: JSON.stringify({ ...context, previousState: 'PAY_BILLS' }) }});
+            ];
+            await whapiService.sendList(phoneNumber, `⚡ *Electricity & Utilities*\n\nSelect your distribution company (Disco):`, "Power Companies", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'UTILITIES_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
 
         if (rawText === 'CABLE_TV_MENU') {
-            const msg = `📺 *Cable TV Subscriptions*\n\nSelect your service provider:`;
-            await whapiService.sendList(phoneNumber, msg, "TV Providers", [
+            const menu = [
                 { id: "TV_DSTV", title: "DStv", description: "Premium entertainment" },
                 { id: "TV_GOTV", title: "GOtv", description: "Family entertainment" },
                 { id: "TV_STARTIMES", title: "StarTimes", description: "Affordable cable" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'CABLE_TV_MENU', context: JSON.stringify({ ...context, previousState: 'PAY_BILLS' }) }});
+            ];
+            await whapiService.sendList(phoneNumber, `📺 *Cable TV Subscriptions*\n\nSelect your service provider:`, "TV Providers", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'CABLE_TV_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
 
@@ -465,30 +481,30 @@ export class WebhookController {
         }
 
         if (rawText === 'ASSET_TRADING' || rawText === 'REFRESH' && session.currentState === 'ASSET_TRADING') {
-            const assetTxt = `₿ *Asset Trading Desk*\n\nSelect a market to trade in:`;
-            await whapiService.sendList(phoneNumber, assetTxt, "Trading Markets", [
+            const menu = [
                 { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
                 { id: "GIFTCARD", title: "🎁 Sell Giftcards", description: "Trade giftcards for cash" },
                 { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'ASSET_TRADING', context: JSON.stringify({ ...context, previousState: 'START' }) }});
+            ];
+            await whapiService.sendList(phoneNumber, `₿ *Asset Trading Desk*\n\nSelect a market to trade in:`, "Trading Markets", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'ASSET_TRADING', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
 
         if (rawText === 'GLOBAL_ACCOUNTS' || rawText === 'REFRESH' && session.currentState === 'GLOBAL_ACCOUNTS') {
             const emailStatus = user.email ? `✅ *Archiving Active*: ${user.email}` : `❌ *Archiving Inactive*: No email linked.`;
             const securityStatus = `🔒 *Session Guard*: Active (10-min timeout)\n${emailStatus}`;
-            const globalTxt = `🌍 *Global Wallets & Security*\n\n${securityStatus}\n\nExpand your financial reach:`;
-            await whapiService.sendList(phoneNumber, globalTxt, "Global Services", [
+            const menu = [
                 { id: "OPEN_ACCOUNT_USD", title: "🇺🇸 Open USD Account", description: "Get US Banking details" },
                 { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Open GBP Account", description: "Get UK Banking details" },
                 { id: "SET_EMAIL", title: user.email ? "📧 Update Archive Email" : "📧 Link Archive Email", description: "Save receipts to email" },
                 { id: "SECURITY_INFO", title: "🔒 Security Overview", description: "Vault protection details" },
                 { id: "BACK", title: "🔙 Back", description: "Return" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
-            ]);
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'GLOBAL_ACCOUNTS', context: JSON.stringify({ ...context, previousState: 'START' }) }});
+            ];
+            await whapiService.sendList(phoneNumber, `🌍 *Global Wallets & Security*\n\n${securityStatus}\n\nExpand your financial reach:`, "Global Services", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'GLOBAL_ACCOUNTS', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
 

@@ -239,6 +239,7 @@ export class WhapiService {
                     body: { text: text },
                     footer: footer ? { text: footer } : undefined,
                     action: {
+                        action: 'buttons',
                         buttons: buttons.map(b => ({
                             type: 'reply',
                             reply: { id: b.id, title: b.title.replace(/[^\w\s]/gi, '').trim().slice(0, 20) }
