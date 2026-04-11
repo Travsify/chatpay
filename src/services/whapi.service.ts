@@ -11,6 +11,11 @@ export class WhapiService {
     }
 
     private async getToken() {
+        // PRIORITY 0: Direct Environment Override (Persistent on Render)
+        if (process.env.WHAPI_TOKEN && process.env.WHAPI_TOKEN !== '' && process.env.WHAPI_TOKEN !== 'your_whapi_token_here') {
+            return process.env.WHAPI_TOKEN;
+        }
+
         // PRIORITY 1: Check Database (God Mode Vault)
         try {
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
@@ -21,13 +26,8 @@ export class WhapiService {
             console.error('[Whapi] Failed to fetch token from DB');
         }
 
-        // PRIORITY 2: Fallback to Environment Variable
-        if (this.token && this.token !== '' && this.token !== 'your_whapi_token_here') {
-            return this.token;
-        }
-
-        // PRIORITY 3: Emergency Hardcoded Fallback (for immediate activation)
-        return 'dpbmczIIkfqHDHq509phi7CA8w3RDK5A';
+        // PRIORITY 2: Emergency Hardcoded Fallback (for immediate activation)
+        return 'eoR2mA57NDEn40E6OrfrD6y5PcajTBjx';
     }
 
     async sendMessage(to: string, body: string) {
