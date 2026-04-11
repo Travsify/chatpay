@@ -185,18 +185,17 @@ export class WhapiService {
             const numericTo = to.replace(/\D/g, '');
             const response = await axios.post(`${apiUrl}/messages/interactive`, {
                 to: numericTo,
-                type: 'interactive',
-                interactive: {
-                    type: 'list',
-                    body: { text: text },
-                    action: {
-                        name: 'list', 
-                        button: buttonText.replace(/[^\w\s]/gi, '').trim().slice(0, 20),
+                type: 'list',
+                body: { text: text },
+                action: {
+                    list: {
+                        label: buttonText.replace(/[^\w\s]/gi, '').trim().slice(0, 20),
                         sections: [{
                             title: "Select Service",
                             rows: rows.map(r => ({
                                 id: r.id,
-                                title: r.title.replace(/[^\w\s]/gi, '').trim().slice(0, 24)
+                                title: r.title.replace(/[^\w\s]/gi, '').trim().slice(0, 24),
+                                ...(r.description ? { description: r.description.slice(0, 72) } : {})
                             }))
                         }]
                     }
@@ -233,18 +232,15 @@ export class WhapiService {
             const numericTo = to.replace(/\D/g, '');
             const response = await axios.post(`${apiUrl}/messages/interactive`, {
                 to: numericTo,
-                type: 'interactive',
-                interactive: {
-                    type: 'button',
-                    body: { text: text },
-                    footer: footer ? { text: footer } : undefined,
-                    action: {
-                        name: 'buttons',
-                        buttons: buttons.map(b => ({
-                            type: 'reply',
-                            reply: { id: b.id, title: b.title.replace(/[^\w\s]/gi, '').trim().slice(0, 20) }
-                        }))
-                    }
+                type: 'button',
+                body: { text: text },
+                ...(footer ? { footer: { text: footer } } : {}),
+                action: {
+                    buttons: buttons.map(b => ({
+                        type: 'quick_reply',
+                        id: b.id,
+                        title: b.title.replace(/[^\w\s]/gi, '').trim().slice(0, 20)
+                    }))
                 }
             }, {
                 headers: {
