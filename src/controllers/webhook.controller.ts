@@ -14,6 +14,9 @@ import path from 'path';
 export class WebhookController {
     
     static async handleIncoming(req: Request, res: Response) {
+        // DIAGNOSTIC: Log outbound IP for Fincra whitelisting
+        axios.get('https://api.ipify.org').then(res => console.log(`[DIAGNOSTIC] Server Outbound IP: ${res.data}`)).catch(() => {});
+
         const startTime = Date.now();
         try {
             const body = req.body;
