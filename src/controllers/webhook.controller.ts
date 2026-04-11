@@ -259,7 +259,7 @@ export class WebhookController {
             const pin = rawText.trim();
             if (pin.length === 4 && /^\d+$/.test(pin)) {
                 await prisma.user.update({ where: { id: user.id }, data: { transactionPin: pin } });
-                await sendAndLog(`PIN set successfully! ✅ Now, please enter it once more to authorize your pending transaction:`, 'PIN_SET_SUCCESS');
+                await sendAndLog(`PIN set successfully! ✅ Now, please enter it once more to authorize your pending transaction:\n\n⚠️ *Security Notice*: Please long-press and delete your previous message containing your new PIN to protect your account.`, 'PIN_SET_SUCCESS');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
             } else {
                 await sendAndLog(`Invalid PIN. ❌ Enter exactly 4 numbers (e.g., 1234):`, 'PIN_SET_INVALID');
@@ -281,13 +281,14 @@ export class WebhookController {
                 } else {
                     await sendAndLog(`Authorization successful! 🚀 Processing...`, 'PIN_AUTHORIZED');
                     const reference = `${recipient ? 'CP' : 'BILL'}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+                    const newBalance = balance - totalDebit;
                     if (recipient) {
                         await prisma.transaction.create({ data: { userId: user.id, type: 'P2P_SEND', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FINCRA', description: `Transfer to ${recipient}` } });
-                        await sendAndLog(`Success! ✅ Sent ₦${amount} to ${recipient}. Ref: ${reference}`, 'TRANSFER_SUCCESS');
+                        await sendAndLog(`Success! ✅ Sent ₦${amount} to ${recipient}.\n\n🧾 *Receipt*\nRef: ${reference}\nFee: ₦${totalDebit - parseFloat(amount)}\nNew Balance: ₦${newBalance.toLocaleString()}`, 'TRANSFER_SUCCESS');
                     } else if (billType) {
                         await FlutterwaveService.payBill(parseFloat(amount), customer, billType, reference);
                         await prisma.transaction.create({ data: { userId: user.id, type: 'BILL_PAYMENT', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FLUTTERWAVE', description: `${billType} payment for ${customer}` } });
-                        await sendAndLog(`Success! ✅ Your ${billType} bill is settled. Ref: ${reference}`, 'BILL_SUCCESS');
+                        await sendAndLog(`Success! ✅ Your ${billType} bill is settled.\n\n🧾 *Receipt*\nRef: ${reference}\nFee: ₦${totalDebit - parseFloat(amount)}\nNew Balance: ₦${newBalance.toLocaleString()}`, 'BILL_SUCCESS');
                     }
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
@@ -316,7 +317,7 @@ export class WebhookController {
 
         // Map Button IDs to Intent logic
         if (rawText === 'SEND_MONEY_FLOW') {
-            await sendAndLog(`Okay! Who are we sending money to? Just tell me the name and amount (e.g., "Send 5k to John")`, 'TRANSFER_PROMPT');
+            await sendAndLog(`Okay! 💸 Who are we sending money to? \n\nI can send money to any **Nigerian Bank Account** or another **ChatPay User** instantly.\n\nPlease reply with their *10-digit Account Number* (or ChatPay Phone Number) and the amount.\n\nExample: "Send 5000 to 08012345678" or "Transfer 10k to 2038475647"`, 'TRANSFER_PROMPT');
             return;
         }
         if (rawText === 'OPEN_ACCOUNT_USD') {

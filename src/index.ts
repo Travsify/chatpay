@@ -7,6 +7,7 @@ import path from 'path';
 import cors from 'cors';
 import fs from 'fs';
 import { WebhookController } from './controllers/webhook.controller.js';
+import { FincraWebhookController } from './controllers/fincra.webhook.controller.js';
 import { AdminController } from './controllers/admin.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
 import { authMiddleware, requireRole } from './middleware/auth.middleware.js';
@@ -62,6 +63,9 @@ app.get('/api/config/public', async (req, res) => {
 
 // WhatsApp webhook (Whapi.cloud)
 app.post('/webhook/whatsapp', WebhookController.handleIncoming);
+
+// Fincra webhook (Deposits)
+app.post('/webhook/fincra', FincraWebhookController.handleIncoming);
 
 // ===== AUTH ROUTES =====
 app.post('/api/auth/setup', AuthController.setupFirstAdmin);
