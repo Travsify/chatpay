@@ -190,6 +190,7 @@ export class WhapiService {
                     type: 'list',
                     body: { text: text },
                     action: {
+                        action: 'list', // Required by some Whapi versions
                         button: buttonText.replace(/[^\w\s]/gi, '').trim().slice(0, 20),
                         sections: [{
                             title: "Select Service",
