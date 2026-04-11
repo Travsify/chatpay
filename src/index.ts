@@ -82,7 +82,7 @@ if (fs.existsSync(frontendPath)) {
     });
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`\n🏦 ChatPay Server v3.1 — Global Autonomous Bank Active\n   Port: ${PORT}`);
     
