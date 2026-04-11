@@ -107,14 +107,20 @@ export class WebhookController {
         const context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
 
         // ===== UX: NUMBER-BASED MENU SELECTION =====
-        // If the user typed a single number, try to map it to the last sent menu options
         if (/^\d+$/.test(rawText) && context.lastMenuOptions) {
             const index = parseInt(rawText) - 1;
             if (index >= 0 && index < context.lastMenuOptions.length) {
                 const mappedId = context.lastMenuOptions[index].id;
-                console.log(`[UX] Mapping number "${rawText}" to menu ID: ${mappedId}`);
+                console.log(`[UX] Mapping number "${rawText}" to menu ID: ${mappedId} for user ${phoneNumber}`);
                 rawText = mappedId;
             }
+        }
+
+        // ===== SECURITY: KYC GATEWAY =====
+        const bankingCommands = ['CHECK_BALANCE', 'FUND_WALLET', 'SEND_MONEY', 'PAY_BILLS', 'CARD_MENU', 'ASSET_TRADING', 'GLOBAL_ACCOUNTS', 'GLOBAL_WALLETS'];
+        if (bankingCommands.includes(rawText) && user.kycStatus !== 'VERIFIED') {
+            await sendAndLog(`🔐 *Security Guard:* You must complete your account activation before accessing banking features.`, 'KYC_REQUIRED');
+            return WebhookController.processLogic(user, session, aiResult, 'MENU');
         }
 
         // Helper to send + log outbound messages (Hybrid Text/Voice)
@@ -817,9 +823,9 @@ export class WebhookController {
 
             case 'UNKNOWN':
             default:
-                if (rawText !== 'REFRESH' && !isHi && !isMenu) {
-                    await sendAndLog(aiResult.response || "I'm not exactly sure how to help with that. Let me show you the menu so you can choose an option:", aiResult.intent);
-                    // After AI response, always provide a menu to ensure the user isn't stuck
+                if (rawText !== 'REFRESH' && !isHi && !isMenu && rawText !== 'MENU') {
+                    // Always show the current menu if we don't understand, to prevent the user from being stuck
+                    await sendAndLog("I'm here to help, but I'm not sure about that request. 🤖 Let's stick to the menu options below:", 'FALLBACK_MENU');
                     return WebhookController.processLogic(user, session, aiResult, 'REFRESH');
                 }
                 break;
