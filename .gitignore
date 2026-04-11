@@ -18,4 +18,12 @@ frontend/dist/
 # OS/IDEs
 .DS_Store
 .vscode/
-.idea/
+# Logs & Temp
+scratch/
+scripts/*.js
+scripts/*.js.map
+scripts/*.d.ts
+scripts/*.d.ts.map
+whapi_test.ts
+logs.txt
+

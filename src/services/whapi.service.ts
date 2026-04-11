@@ -178,15 +178,21 @@ export class WhapiService {
     async sendList(to: string, text: string, buttonText: string, rows: { id: string; title: string; description?: string }[]) {
         const token = await this.getToken();
         const apiUrl = await this.getUrl();
+        let cleanTo = to.replace(/\D/g, '');
+        if (!cleanTo.includes('@')) cleanTo += '@s.whatsapp.net';
+
         try {
             const response = await axios.post(`${apiUrl}/messages/interactive`, {
-                to,
-                body: text,
-                button: buttonText,
-                sections: [{
-                    title: "Options",
-                    rows: rows
-                }]
+                to: cleanTo,
+                body: { text: text },
+                action: {
+                    action: 'list', // Explicitly satisfy the "action must have action" requirement
+                    button: buttonText,
+                    sections: [{
+                        title: "Options",
+                        rows: rows
+                    }]
+                }
             }, {
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -195,7 +201,17 @@ export class WhapiService {
             });
             return response.data;
         } catch (error: any) {
-            console.error('[Whapi] List send failed:', error.response?.data || error.message);
+            const errorData = error.response?.data || error.message;
+            console.error('[Whapi] List send failed, falling back to text:', JSON.stringify(errorData));
+            
+            // Format fallback text
+            let fallbackText = `${text}\n\n*${buttonText}:*\n`;
+            rows.forEach((row, idx) => {
+                fallbackText += `${idx + 1}. *${row.title}*${row.description ? ` - ${row.description}` : ''}\n`;
+            });
+            fallbackText += `\n_Reply with the option name or number._`;
+
+            return await this.sendMessage(cleanTo, fallbackText);
         }
     }
 
