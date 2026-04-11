@@ -43,11 +43,15 @@ export class WalletService {
 
     static async getBalance(userId: string) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
-        if (!user || !user.fincraWalletId) return 0;
+        if (!user || !user.fincraWalletId || user.fincraWalletId === 'PENDING') return 0;
         
-        // In real world, we'd call Fincra API here
-        // const balanceData = await fincraService.getWalletBalance(user.fincraWalletId);
-        // return balanceData.availableBalance;
-        return 15250.75; // Mocked
+        try {
+            const balanceData = await fincraService.getWalletBalance(user.fincraWalletId);
+            // Fincra returns numeric strings in sub-units usually, ensure we return the float amount
+            return parseFloat(balanceData.data?.availableBalance || '0');
+        } catch (error) {
+            console.error('Wallet balance fetch failed:', error);
+            return 0;
+        }
     }
 }

@@ -1,18 +1,23 @@
 import axios from 'axios';
+import prisma from '../utils/prisma.js';
 
 export class FincraService {
-    private apiUrl: string;
-    private apiKey: string;
+    private async getApiKey() {
+        const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+        return config?.fincraSecret || process.env.FINCRA_API_KEY || '';
+    }
 
-    constructor() {
-        this.apiUrl = process.env.FINCRA_BASE_URL || 'https://api.fincra.com';
-        this.apiKey = process.env.FINCRA_API_KEY || '';
+    private async getBaseUrl() {
+        const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+        return config?.whapiApiUrl?.includes('sandbox') ? 'https://sandbox-api.fincra.com' : 'https://api.fincra.com';
     }
 
     async createCustomer(data: { firstName: string, lastName: string, email: string, phoneNumber: string, type: 'individual' | 'business' }) {
         try {
-            const response = await axios.post(`${this.apiUrl}/core/customers`, data, {
-                headers: { 'api-key': this.apiKey, 'Content-Type': 'application/json' }
+            const apiKey = await this.getApiKey();
+            const baseUrl = await this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/core/customers`, data, {
+                headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
             });
             return response.data;
         } catch (error: any) {
@@ -23,8 +28,10 @@ export class FincraService {
 
     async createVirtualAccount(data: { currency: string, accountType: 'default' | 'mapped', customerId: string }) {
         try {
-            const response = await axios.post(`${this.apiUrl}/core/virtual-accounts`, data, {
-                headers: { 'api-key': this.apiKey, 'Content-Type': 'application/json' }
+            const apiKey = await this.getApiKey();
+            const baseUrl = await this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/core/virtual-accounts`, data, {
+                headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
             });
             return response.data;
         } catch (error: any) {
@@ -35,8 +42,10 @@ export class FincraService {
 
     async getWalletBalance(walletId: string) {
         try {
-            const response = await axios.get(`${this.apiUrl}/core/wallets/${walletId}`, {
-                headers: { 'api-key': this.apiKey }
+            const apiKey = await this.getApiKey();
+            const baseUrl = await this.getBaseUrl();
+            const response = await axios.get(`${baseUrl}/core/wallets/${walletId}`, {
+                headers: { 'api-key': apiKey }
             });
             return response.data;
         } catch (error: any) {
@@ -47,8 +56,10 @@ export class FincraService {
 
     async transferFunds(data: { amount: number, currency: string, destinationAddress: string, paymentDestination: 'fincra_wallet' | 'bank_account' }) {
         try {
-            const response = await axios.post(`${this.apiUrl}/core/disbursements`, data, {
-                headers: { 'api-key': this.apiKey, 'Content-Type': 'application/json' }
+            const apiKey = await this.getApiKey();
+            const baseUrl = await this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/core/disbursements`, data, {
+                headers: { 'api-key': apiKey, 'Content-Type': 'application/json' }
             });
             return response.data;
         } catch (error: any) {
