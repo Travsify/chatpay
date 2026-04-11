@@ -21,15 +21,10 @@ app.use(bodyParser.json());
 
 // Health check JSON
 app.get('/api/status', (req, res) => {
-    const p = path.join(process.cwd(), 'frontend', 'dist');
     res.json({ 
         message: 'ChatPay API — Operational',
         version: '3.1.0',
-        timestamp: new Date().toISOString(),
-        cwd: process.cwd(),
-        frontendExists: fs.existsSync(p),
-        __dirname: __dirname,
-        contents: fs.existsSync(process.cwd() + '/frontend') ? fs.readdirSync(process.cwd() + '/frontend') : []
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -72,17 +67,17 @@ app.get('/api/admin/conversations', authMiddleware, AdminController.getConversat
 app.get('/api/admin/webhooks', authMiddleware, AdminController.getWebhookLogs);
 
 // ===== SERVE FRONTEND (Production) =====
-const frontendPath = path.join(process.cwd(), 'frontend', 'dist');
-if (fs.existsSync(frontendPath)) {
-    app.use(express.static(frontendPath));
-    app.use((req, res, next) => {
-        if (!req.path.startsWith('/api') && !req.path.startsWith('/webhook')) {
-            res.sendFile(path.join(frontendPath, 'index.html'));
-        } else {
-            next();
-        }
-    });
-}
+// In dist/index.js, __dirname is the `dist` folder. The frontend dist is in `../frontend/dist`.
+const frontendPath = path.join(__dirname, '../frontend/dist');
+
+app.use(express.static(frontendPath));
+app.use((req, res, next) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/webhook')) {
+        res.sendFile(path.join(frontendPath, 'index.html'));
+    } else {
+        next();
+    }
+});
 
 const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, '0.0.0.0', async () => {
