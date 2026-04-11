@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../utils/prisma.js';
 import { whapiService } from '../services/whapi.service.js';
+import { EmailService } from '../services/email.service.js';
 
 export class FincraWebhookController {
     static async handleIncoming(req: Request, res: Response) {
@@ -81,6 +82,9 @@ export class FincraWebhookController {
             try {
                 await whapiService.sendMessage(user.phoneNumber, alertMessage);
                 console.log(`[Fincra Webhook] Sent credit alert to ${user.phoneNumber}`);
+                if (user.email) {
+                    await EmailService.sendReceipt(user.email, { type: 'Deposit (Incoming)', amount, reference, balance });
+                }
             } catch (notifyErr) {
                 console.error(`[Fincra Webhook] Failed to send Whapi alert to ${user.phoneNumber}`, notifyErr);
             }

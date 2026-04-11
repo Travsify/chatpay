@@ -8,6 +8,7 @@ import { quidaxService } from '../services/quidax.service.js';
 import { mapleradService } from '../services/maplerad.service.js';
 import { pressMntService } from '../services/pressmnt.service.js';
 import { VoiceService } from '../services/voice.service.js';
+import { EmailService } from '../services/email.service.js';
 import prisma from '../utils/prisma.js';
 import fs from 'fs';
 import path from 'path';
@@ -310,10 +311,12 @@ export class WebhookController {
                     if (recipient) {
                         await prisma.transaction.create({ data: { userId: user.id, type: 'P2P_SEND', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FINCRA', description: `Transfer to ${recipient}` } });
                         await sendAndLog(`Success! ✅ Sent ₦${amount} to ${recipient}.\n\n🧾 *Receipt*\nRef: ${reference}\nFee: ₦${totalDebit - parseFloat(amount)}\nNew Balance: ₦${newBalance.toLocaleString()}`, 'TRANSFER_SUCCESS');
+                        if (user.email) await EmailService.sendReceipt(user.email, { type: 'Transfer', amount: parseFloat(amount), reference, balance: newBalance, recipient });
                     } else if (billType) {
                         await FlutterwaveService.payBill(parseFloat(amount), customer, billType, reference);
                         await prisma.transaction.create({ data: { userId: user.id, type: 'BILL_PAYMENT', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FLUTTERWAVE', description: `${billType} payment for ${customer}` } });
                         await sendAndLog(`Success! ✅ Your ${billType} bill is settled.\n\n🧾 *Receipt*\nRef: ${reference}\nFee: ₦${totalDebit - parseFloat(amount)}\nNew Balance: ₦${newBalance.toLocaleString()}`, 'BILL_SUCCESS');
+                        if (user.email) await EmailService.sendReceipt(user.email, { type: billType, amount: parseFloat(amount), reference, balance: newBalance });
                     }
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
@@ -400,12 +403,57 @@ export class WebhookController {
             const globalTxt = `🌍 *Global Wallets*\n\nExpand your financial reach:`;
             await whapiService.sendList(phoneNumber, globalTxt, "Global Services", [
                 { id: "OPEN_ACCOUNT_USD", title: "🇺🇸 Open USD Account", description: "Get US Banking details" },
-                { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Open GBP Account", description: "Get UK Banking details" },
+                { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Fund GBP Account", description: "Get UK Banking details" },
+                { id: "SET_EMAIL", title: "📧 Secure Archiving", description: "Send receipts to your email" },
                 { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'GLOBAL_ACCOUNTS', context: JSON.stringify({ ...context, previousState: 'START' }) }});
             return;
+        }
+
+        if (rawText === 'SET_EMAIL') {
+            await sendAndLog(`📧 *Secure Archiving Setup*\n\nPlease reply with your *Email Address*. I will send your transaction receipts, invoices, and statements here for your records.`, 'SET_EMAIL_PROMPT');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_EMAIL', context: JSON.stringify({ ...context, previousState: 'GLOBAL_ACCOUNTS' }) } });
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_EMAIL') {
+            if (rawText.includes('@') && rawText.includes('.')) {
+                await prisma.user.update({ where: { id: user.id }, data: { email: rawText.toLowerCase().trim() } });
+                await sendAndLog(`Success! 📧 Your receipts will now be archived at *${rawText}*.\n\n⚠️ *Pro Tip*: To completely clear your WhatsApp history, go to *Chat Settings* > *Ephemeral Messages* and set it to **24 Hours**. This ensures no data remains on your physical device if lost.`, 'EMAIL_SET_SUCCESS');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+            } else {
+                await sendAndLog(`Invalid email format. Please try again:`, 'EMAIL_INVALID');
+            }
+            return;
+        }
+
+        // ===== SECURITY: SESSION TIMEOUT CHECK (10 Minutes) =====
+        const TEN_MINUTES = 10 * 60 * 1000;
+        const now = new Date();
+        const lastUpdated = new Date(session.updatedAt);
+        const diff = now.getTime() - lastUpdated.getTime();
+
+        if (diff > TEN_MINUTES && session.currentState !== 'START' && session.currentState !== 'AWAITING_REAUTH_PIN') {
+            await whapiService.sendMessage(phoneNumber, `🔒 *Session Expired:* For your security, please enter your *4-digit PIN* to resume banking:`);
+            await prisma.session.update({ 
+                where: { id: session.id }, 
+                data: { currentState: 'AWAITING_REAUTH_PIN', updatedAt: now } 
+            });
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_REAUTH_PIN') {
+            if (rawText === user.transactionPin) {
+                await sendAndLog(`✅ *Re-authenticated!* How can I help you today?`, 'REAUTH_SUCCESS');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', updatedAt: now } });
+                // Re-trigger the menu
+                return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'Menu');
+            } else {
+                await sendAndLog(`❌ Incorrect PIN. Please try again or type 'Reset' if you forgot it:`, 'REAUTH_FAILED');
+                return;
+            }
         }
 
         if (rawText === 'SEND_MONEY_FLOW') {
