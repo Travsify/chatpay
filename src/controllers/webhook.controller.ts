@@ -207,7 +207,10 @@ export class WebhookController {
             if (isVerified) {
                 await prisma.user.update({ 
                     where: { id: user.id }, 
-                    data: { kycStatus: 'VERIFIED' } 
+                    data: { 
+                        kycStatus: 'VERIFIED',
+                        ...(isBusiness ? {} : { bvn: rawText.replace(/\D/g, '') }) 
+                    } 
                 });
                 
                 await sendAndLog(`Verified! ✅ Finalizing your ${isBusiness ? 'Business' : 'Individual'} wallet setup...`, 'KYC_VERIFIED');
