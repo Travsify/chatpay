@@ -46,16 +46,44 @@ export class WalletService {
     }
 
     static async getBalance(userId: string) {
-        const user = await prisma.user.findUnique({ where: { id: userId } });
+        let user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user) return 0;
+        
+        // AUTO-SYNC: If account is pending, try to fetch it now
+        if (!user.fincraWalletId || user.fincraWalletId === 'PENDING') {
+            await this.syncWallet(userId);
+            user = await prisma.user.findUnique({ where: { id: userId } });
+        }
+
         if (!user || !user.fincraWalletId || user.fincraWalletId === 'PENDING') return 0;
         
         try {
             const balanceData = await fincraService.getWalletBalance(user.fincraWalletId);
-            // Fincra returns numeric strings in sub-units usually, ensure we return the float amount
             return parseFloat(balanceData.data?.availableBalance || '0');
         } catch (error) {
             console.error('Wallet balance fetch failed:', error);
             return 0;
         }
+    }
+
+    static async syncWallet(userId: string) {
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        if (!user || !user.fincraCustomerId) return null;
+
+        try {
+            const accounts = await fincraService.listVirtualAccounts(user.fincraCustomerId);
+            const ngnAccount = (accounts.data || []).find((a: any) => a.currency === 'NGN' && a.accountNumber);
+            
+            if (ngnAccount) {
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: { fincraWalletId: ngnAccount.accountNumber }
+                });
+                return ngnAccount;
+            }
+        } catch (e) {
+            console.error('[Wallet] Sync failed:', e);
+        }
+        return null;
     }
 }

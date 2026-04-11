@@ -31,7 +31,7 @@ app.get('/api/status', async (req, res) => {
     }
     res.json({ 
         message: 'ChatPay API — Operational',
-        version: '3.15.0',
+        version: '3.16.0',
         timestamp: new Date().toISOString(),
         frontendExists: fs.existsSync(p),
         database: dbStatus
@@ -108,7 +108,7 @@ app.use((req, res, next) => {
 
 const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`\n🏦 ChatPay Server v3.15.0 — Global Autonomous Bank Active\n   Port: ${PORT}`);
+    console.log(`\n🏦 ChatPay Server v3.16.0 — Global Autonomous Bank Active\n   Port: ${PORT}`);
     
     // Auto-sync webhook on start
     try {

@@ -39,6 +39,20 @@ export class FincraService {
             throw error;
         }
     }
+    
+    async listVirtualAccounts(customerId: string) {
+        try {
+            const apiKey = await this.getApiKey();
+            const baseUrl = await this.getBaseUrl();
+            const response = await axios.get(`${baseUrl}/core/virtual-accounts?customer=${customerId}`, {
+                headers: { 'api-key': apiKey }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Error listing Fincra virtual accounts:', error.response?.data || error.message);
+            throw error;
+        }
+    }
 
     async getWalletBalance(walletId: string) {
         try {
