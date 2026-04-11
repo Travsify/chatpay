@@ -184,13 +184,17 @@ export class WhapiService {
         try {
             const response = await axios.post(`${apiUrl}/messages/interactive`, {
                 to: cleanTo,
+                type: 'list',
                 body: { text: text },
                 action: {
-                    action: 'list', // Explicitly satisfy the "action must have action" requirement
                     button: buttonText,
                     sections: [{
-                        title: "Options",
-                        rows: rows
+                        title: "Services",
+                        rows: rows.map(r => ({
+                            id: r.id,
+                            title: r.title.replace(/[^\w\s]/gi, '').trim(), // Strip emojis for stability test
+                            description: r.description
+                        }))
                     }]
                 }
             }, {
@@ -224,6 +228,7 @@ export class WhapiService {
         try {
             const response = await axios.post(`${apiUrl}/messages/interactive`, {
                 to: cleanTo,
+                type: 'button',
                 body: { text: text },
                 footer: footer ? { text: footer } : undefined,
                 action: {
