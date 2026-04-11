@@ -21,10 +21,17 @@ app.use(bodyParser.json());
 
 // Health check JSON
 app.get('/api/status', (req, res) => {
+    const fPath = path.join(__dirname, '../frontend/dist');
+    const fExists = fs.existsSync(fPath);
+    const indexExists = fs.existsSync(path.join(fPath, 'index.html'));
     res.json({ 
         message: 'ChatPay API — Operational',
         version: '3.2.0',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        __dirname,
+        fPath,
+        fExists,
+        indexExists
     });
 });
 
@@ -73,7 +80,12 @@ const frontendPath = path.join(__dirname, '../frontend/dist');
 app.use(express.static(frontendPath));
 app.use((req, res, next) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/webhook')) {
-        res.sendFile(path.join(frontendPath, 'index.html'));
+        res.sendFile(path.join(frontendPath, 'index.html'), (err) => {
+            if (err) {
+                console.error("sendFile error:", err);
+                res.status(500).send("Error serving frontend: " + err.message + " Path: " + path.join(frontendPath, 'index.html'));
+            }
+        });
     } else {
         next();
     }
