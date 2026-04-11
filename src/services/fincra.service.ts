@@ -20,6 +20,23 @@ export class FincraService {
             'Accept': 'application/json'
         };
     }
+    
+    /**
+     * Create a customer object on Fincra.
+     * Required for International Virtual Accounts.
+     */
+    async createCustomer(data: { name: string, email: string, phoneNumber: string, type: 'individual' | 'corporate' }) {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/customers`, data, {
+                headers: await this.getHeaders()
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fincra] Error creating customer:', error.response?.data || error.message);
+            throw error;
+        }
+    }
 
     /**
      * Create an NGN virtual account directly (no separate customer step needed).
@@ -35,7 +52,8 @@ export class FincraService {
         currency?: string,
         channel?: string,
         merchantReference?: string,
-        businessName?: string
+        businessName?: string,
+        customerId?: string // Optional, required for some currencies
     }) {
         try {
             const apiKey = await this.getApiKey();
@@ -50,6 +68,10 @@ export class FincraService {
                     email: data.email,
                 }
             };
+
+            if (data.customerId) {
+                payload.customerId = data.customerId;
+            }
 
             // BVN is required for NGN accounts
             if (data.bvn) {

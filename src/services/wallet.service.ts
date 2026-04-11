@@ -21,16 +21,36 @@ export class WalletService {
             const names = (user.name || 'ChatPay User').split(' ');
             const firstName = names[0];
             const lastName = names.slice(1).join(' ') || 'User';
+            const email = user.email || `${user.phoneNumber}@chatpay.io`;
+
+            let customerId = undefined;
+            if (currency !== 'NGN') {
+                try {
+                    console.log(`[Wallet] Creating Customer for FCY account: ${user.name}`);
+                    const customer = await fincraService.createCustomer({
+                        name: user.name || 'ChatPay User',
+                        email: email,
+                        phoneNumber: user.phoneNumber,
+                        type: type === 'business' ? 'corporate' : 'individual'
+                    });
+                    customerId = customer.data?._id;
+                } catch (e: any) {
+                    // If customer already exists, try to continue or fetch? 
+                    // Fincra often returns 409 if customer exists.
+                    console.warn(`[Wallet] Customer creation warning for FCY:`, e.message);
+                }
+            }
 
             const result = await fincraService.createVirtualAccount({
                 firstName: type === 'business' ? (businessName || firstName) : firstName,
                 lastName: type === 'business' ? 'Enterprise' : lastName,
-                email: `${user.phoneNumber}@chatpay.io`,
+                email: email,
                 accountType: type === 'business' ? 'corporate' : 'individual',
                 bvn: user.bvn || process.env.FINCRA_DEFAULT_BVN || '22222222222',
                 currency: currency,
                 businessName: type === 'business' ? businessName : undefined,
-                merchantReference: `chatpay-${user.id.slice(0, 8)}`
+                merchantReference: `chatpay-${user.id.slice(0, 8)}-${currency.toLowerCase()}`,
+                customerId: customerId
             });
 
             // Extract account details from response

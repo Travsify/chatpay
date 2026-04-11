@@ -481,8 +481,8 @@ export class WebhookController {
             const securityStatus = `🔒 *Session Guard*: Active (10-min timeout)\n${emailStatus}`;
             const globalTxt = `🌍 *Global Wallets & Security*\n\n${securityStatus}\n\nExpand your financial reach:`;
             await whapiService.sendList(phoneNumber, globalTxt, "Global Services", [
-                { id: "OPEN_ACCOUNT_USD_DISABLED", title: "🇺🇸 USD Account", description: "Coming Soon ⏳" },
-                { id: "OPEN_ACCOUNT_GBP_DISABLED", title: "🇬🇧 GBP Account", description: "Coming Soon ⏳" },
+                { id: "OPEN_ACCOUNT_USD", title: "🇺🇸 Open USD Account", description: "Get US Banking details" },
+                { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Open GBP Account", description: "Get UK Banking details" },
                 { id: "SET_EMAIL", title: user.email ? "📧 Update Archive Email" : "📧 Link Archive Email", description: "Save receipts to email" },
                 { id: "SECURITY_INFO", title: "🔒 Security Overview", description: "Vault protection details" },
                 { id: "BACK", title: "🔙 Back", description: "Return" },
@@ -561,11 +561,39 @@ export class WebhookController {
         }
 
         if (rawText === 'OPEN_ACCOUNT_USD') {
-            rawText = "Open a USD account"; // Force AI to process this
+            await sendAndLog(`Generating your *USD* Virtual Account... 🇺🇸 ⏳`, 'USD_START');
+            try {
+                const wallet = await WalletService.setupUserWallet(user.id, 'individual', undefined, 'USD');
+                const msg = `✨ *USD Account Ready!* 🇺🇸\n\n*Account Number*: ${wallet?.accountNumber}\n*Bank*: Fincra Global\n*Account Name*: ${user.name}\n\n_You can now receive US payments directly to your ChatPay vault._`;
+                await whapiService.sendButtons(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
+            } catch (e: any) {
+                const errorBody = e.response?.data?.error || e.message;
+                if (errorBody?.includes('FCY request is disabled')) {
+                    const fail = `❌ *Permission Required*\n\nYour merchant account currently has Foreign Currency (FCY) requests disabled on Fincra.\n\n*What to do:*\n1. Login to your Fincra Dashboard.\n2. Go to *Settings* > *Product Activation*.\n3. Enable **Multi-Currency Virtual Accounts**.\n\nOnce enabled, try again!`;
+                    await sendAndLog(fail, 'FCY_DISABLED');
+                } else {
+                    await sendAndLog(`Account creation failed: ${errorBody}`, 'PROVISIONING_ERROR');
+                }
+            }
+            return;
         }
 
         if (rawText === 'OPEN_ACCOUNT_GBP') {
-            rawText = "Open a GBP account"; // Force AI to process this
+            await sendAndLog(`Generating your *GBP* Virtual Account... 🇬🇧 ⏳`, 'GBP_START');
+            try {
+                const wallet = await WalletService.setupUserWallet(user.id, 'individual', undefined, 'GBP');
+                const msg = `✨ *GBP Account Ready!* 🇬🇧\n\n*Account Number*: ${wallet?.accountNumber}\n*Bank*: Fincra Global\n*Account Name*: ${user.name}\n\n_Welcome to international banking._`;
+                await whapiService.sendButtons(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
+            } catch (e: any) {
+                const errorBody = e.response?.data?.error || e.message;
+                if (errorBody?.includes('FCY request is disabled')) {
+                    const fail = `❌ *Permission Required*\n\nYour merchant account currently has Foreign Currency (FCY) requests disabled on Fincra.\n\n*What to do:*\n1. Login to your Fincra Dashboard.\n2. Go to *Settings* > *Product Activation*.\n3. Enable **Multi-Currency Virtual Accounts**.\n\nOnce enabled, try again!`;
+                    await sendAndLog(fail, 'FCY_DISABLED');
+                } else {
+                    await sendAndLog(`Account creation failed: ${errorBody}`, 'PROVISIONING_ERROR');
+                }
+            }
+            return;
         }
 
         if (rawText === 'CRYPTO_TRADE') {
