@@ -42,11 +42,8 @@ export class WebhookController {
                 let rawText = '';
                 let isAudio = false;
 
-                // 1. Unified Extraction (Text, Voice, Buttons)
-                if (msg.type === 'action' && msg.action?.id) {
-                    rawText = msg.action.id;
-                    if (rawText.includes(':')) rawText = rawText.split(':').pop() || rawText;
-                } else if (msg.type === 'audio' || msg.type === 'voice') {
+                // 1. Robust Extraction (Text, Voice, Buttons, Lists)
+                if (msg.type === 'audio' || msg.type === 'voice') {
                     isAudio = true;
                     try {
                         const buffer = await whapiService.getFileBuffer(msg.audio?.id || msg.voice?.id);
@@ -61,11 +58,25 @@ export class WebhookController {
                     }
                 } else if (msg.type === 'call_log' || msg.type === 'system') {
                     rawText = 'SYSTEM_CALL_REJECTED';
-                } else if (msg.type === 'interactive' || msg.interactive || msg.button_reply || msg.list_reply) {
-                    rawText = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || msg.button_reply?.id || msg.list_reply?.id || '';
-                    if (rawText.includes(':')) rawText = rawText.split(':').pop() || rawText;
                 } else {
-                    rawText = msg.text?.body || '';
+                    // Extract ID from any possible interactive reply path
+                    const interactiveId = 
+                        msg.action?.id || 
+                        msg.interactive?.button_reply?.id || 
+                        msg.interactive?.list_reply?.id || 
+                        msg.button_reply?.id || 
+                        msg.list_reply?.id ||
+                        (msg.type === 'interactive' && msg.interactive?.type === 'button_reply' ? msg.interactive?.button_reply?.id : null) ||
+                        (msg.type === 'interactive' && msg.interactive?.type === 'list_reply' ? msg.interactive?.list_reply?.id : null);
+
+                    if (interactiveId) {
+                        rawText = interactiveId;
+                        // Strip Whapi gateway prefixes
+                        if (rawText.includes(':')) rawText = rawText.split(':').pop() || rawText;
+                        console.log(`[Webhook] Extracted Interactive ID: ${rawText}`);
+                    } else {
+                        rawText = msg.text?.body || msg.body || '';
+                    }
                 }
 
                 if (!rawText) continue;
@@ -109,6 +120,24 @@ export class WebhookController {
         const { phoneNumber } = user;
         let rawText = rawInput;
         const context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
+
+        // Direct ID to Intent Mapping for native UI reliability
+        const directMapping: Record<string, string> = {
+            'CHECK_BALANCE': 'CHECK_BALANCE',
+            'SEND_MONEY': 'SEND_FUNDS',
+            'PAY_BILLS': 'PAY_BILL',
+            'CARD_MENU': 'CARD',
+            'ASSET_TRADING': 'CRYPTO',
+            'GLOBAL_ACCOUNTS': 'OPEN_ACCOUNT',
+            'FUND_WALLET': 'FUND_WALLET',
+            'START_INDIVIDUAL': 'SIGNUP_PERSONAL',
+            'START_BUSINESS': 'SIGNUP_BUSINESS'
+        };
+
+        if (directMapping[rawText]) {
+            console.log(`[UX] Direct intent mapping for ID: ${rawText}`);
+            aiResult.intent = directMapping[rawText];
+        }
 
         // Helper to send + log outbound messages (Hybrid Text/Voice)
         const sendAndLog = async (message: string, intent?: string) => {
@@ -235,14 +264,38 @@ export class WebhookController {
             return;
         }
 
-        // 1. Check Ongoing Flow States
+        if (session.currentState === 'AWAITING_NAME' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_NAME')) {
+            if (rawText !== 'REFRESH') {
+                await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
+                const welcomeMsg = `Thanks ${rawText}! 🤝 To activate your secure vault, choose your account type below:`;
+                const accountMenu = [
+                    { id: "START_INDIVIDUAL", title: "👤 Personal Account", description: "Individual banking & savings" },
+                    { id: "START_BUSINESS", title: "💼 Business Account", description: "For registered companies/entities" },
+                    { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
+                ];
+                await whapiService.sendList(phoneNumber, welcomeMsg, "Select Type", accountMenu);
+                await prisma.session.update({ 
+                    where: { id: session.id }, 
+                    data: { currentState: 'START', context: JSON.stringify({ ...context, name: rawText, lastMenuOptions: accountMenu }) } 
+                });
+            }
+            return;
+        }
+
         if (rawText === 'START_INDIVIDUAL') {
-            await sendAndLog(`Great Choice! To setup your *Personal Account*, what is your **Full Legal Name** as it appears on your ID or BVN?`, 'SIGNUP_NAME_PROMPT');
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_INDIVIDUAL_NAME', context: JSON.stringify({ ...context, type: 'individual' }) } });
+            const userName = user.name || context.name;
+            if (userName) {
+                await sendAndLog(`Great Choice ${userName}! To setup your *Personal Account*, kindly provide your *11-digit Bank Verification Number (BVN)* for private verification. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'START' }) } });
+            } else {
+                await sendAndLog(`Great Choice! To setup your *Personal Account*, what is your **Full Legal Name** as it appears on your ID or BVN?`, 'SIGNUP_NAME_PROMPT');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_INDIVIDUAL_NAME', context: JSON.stringify({ ...context, type: 'individual' }) } });
+            }
             return;
         }
 
         if (rawText === 'START_BUSINESS') {
+            const userName = user.name || context.name;
             await sendAndLog(`Understood. To setup your *Business Account*, please provide your **Registered Business Name**:`, 'SIGNUP_BUSINESS_NAME_PROMPT');
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business' }) } });
             return;
@@ -252,29 +305,16 @@ export class WebhookController {
             if (rawText !== 'REFRESH') {
                 await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
                 await sendAndLog(`Thanks ${rawText}! Finally, kindly provide your *11-digit Bank Verification Number (BVN)* for private verification in order to create your virtual bank account. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, name: rawText, previousState: 'AWAITING_INDIVIDUAL_NAME' }) } });
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, name: rawText, type: 'individual', previousState: 'AWAITING_INDIVIDUAL_NAME' }) } });
             }
             return;
         }
 
         if (session.currentState === 'AWAITING_BUSINESS_NAME' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_BUSINESS_NAME')) {
             if (rawText !== 'REFRESH') {
-                await sendAndLog(`Got it. Now, please provide your business's *CAC Number* (RC Number):`, 'SIGNUP_CAC');
+                await sendAndLog(`Got it. Now, please provide your business's *CAC Number* (RC Number) for verification:`, 'SIGNUP_CAC');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, businessName: rawText, type: 'business', previousState: 'AWAITING_BUSINESS_NAME' }) } });
             }
-            return;
-        }
-
-
-
-
-
-        if (session.currentState === 'AWAITING_BUSINESS_NAME' || rawText === 'REFRESH' && session.currentState === 'AWAITING_BUSINESS_NAME') {
-            await sendAndLog(`Got it. Now, please provide your *CAC Number* (RC Number) for verification:`, 'SIGNUP_CAC');
-            await prisma.session.update({ where: { id: session.id }, data: { 
-                currentState: 'AWAITING_KYC', 
-                context: JSON.stringify({ ...context, businessName: rawText, previousState: 'AWAITING_BUSINESS_NAME' }) 
-            } });
             return;
         }
 
