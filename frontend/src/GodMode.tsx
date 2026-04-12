@@ -28,20 +28,28 @@ const useAuth = () => {
     setAdmin(adminData);
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('cpay_token');
     localStorage.removeItem('cpay_admin');
     setToken(null);
     setAdmin(null);
-  };
+  }, []);
 
-  const api = useCallback((path: string, options: any = {}) => {
-    return axios({
-      url: `${API_BASE}${path}`,
-      headers: { Authorization: `Bearer ${token}`, ...options.headers },
-      ...options
-    });
-  }, [token]);
+  const api = useCallback(async (path: string, options: any = {}) => {
+    try {
+      const response = await axios({
+        url: `${API_BASE}${path}`,
+        headers: { Authorization: `Bearer ${token}`, ...options.headers },
+        ...options
+      });
+      return response;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        logout();
+      }
+      throw error;
+    }
+  }, [token, logout]);
 
   return { token, admin, login, logout, api, isAuth: !!token };
 };
