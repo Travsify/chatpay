@@ -608,9 +608,6 @@ export class WebhookController {
                         await sendAndLog(`❌ Transfer Failed: ${errorMsg}. Your funds are safe. Please try again.`, 'TRANSFER_CRITICAL_FAILURE');
                     }
                 }
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });t), reference, balance: newBalance });
-                    }
-                }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else {
                 await sendAndLog(`Incorrect PIN. ❌ Verification failed. Please try again:`, 'PIN_INCORRECT');
