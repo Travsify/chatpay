@@ -84,6 +84,8 @@ app.post('/api/auth/update-password', authMiddleware, AuthController.updatePassw
 
 // ===== ADMIN ROUTES =====
 app.post('/api/admin/sync-fincra', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.syncFincra);
+app.get('/api/admin/unmatched', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.getUnmatchedTransactions);
+app.post('/api/admin/unmatched/assign', authMiddleware, requireRole('SUPER_ADMIN'), AdminController.assignUnmatchedTransaction);
 app.get('/api/admin/metrics', authMiddleware, AdminController.getMetrics);
 app.get('/api/admin/analytics', authMiddleware, AdminController.getAnalytics);
 app.get('/api/admin/health', authMiddleware, AdminController.getSystemHealth);

@@ -60,7 +60,23 @@ export class SyncService {
                         }
                     });
                     
-                    if (!user) continue;
+                    if (!user) {
+                        // ORPHAN: Record for manual intervention
+                        await prisma.unmatchedTransaction.upsert({
+                            where: { reference },
+                            update: {},
+                            create: {
+                                amount: parseFloat(record.amount || record.settledAmount || '0'),
+                                currency: record.currency || 'NGN',
+                                reference: reference,
+                                provider: 'FINCRA_COLLECTION',
+                                description: `Unmatched: ${record.sourceAccount?.accountName || 'Unknown'} - ${record.sourceAccount?.accountNumber || ''}`,
+                                metadata: JSON.stringify(record)
+                            }
+                        });
+                        console.log(`[SyncService] Orphaned transaction recorded: ${reference}`);
+                        continue;
+                    }
 
                     await prisma.transaction.create({
                         data: {

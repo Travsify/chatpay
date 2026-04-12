@@ -132,6 +132,52 @@ export class AdminController {
         }
     }
 
+    // GET /api/admin/unmatched
+    static async getUnmatchedTransactions(req: AuthRequest, res: Response) {
+        try {
+            const unmatched = await prisma.unmatchedTransaction.findMany({
+                orderBy: { createdAt: 'desc' }
+            });
+            res.json(unmatched);
+        } catch (error: any) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    // POST /api/admin/unmatched/assign
+    static async assignUnmatchedTransaction(req: AuthRequest, res: Response) {
+        try {
+            const { unmatchedId, userId } = req.body;
+
+            const unmatched = await prisma.unmatchedTransaction.findUnique({ where: { id: unmatchedId } });
+            if (!unmatched) return res.status(404).json({ error: 'Unmatched transaction not found' });
+
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            if (!user) return res.status(404).json({ error: 'User not found' });
+
+            // Create real transaction
+            await prisma.transaction.create({
+                data: {
+                    userId: user.id,
+                    type: 'FUNDING',
+                    amount: unmatched.amount,
+                    currency: unmatched.currency,
+                    status: 'SUCCESS',
+                    reference: unmatched.reference,
+                    provider: unmatched.provider + '_ASSIGNED',
+                    description: unmatched.description || 'Manually Assigned Deposit'
+                }
+            });
+
+            // Delete unmatched
+            await prisma.unmatchedTransaction.delete({ where: { id: unmatchedId } });
+
+            res.json({ message: 'Transaction assigned successfully' });
+        } catch (error: any) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     // GET /api/admin/metrics
     static async getMetrics(req: AuthRequest, res: Response) {
         try {

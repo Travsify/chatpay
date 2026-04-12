@@ -567,11 +567,21 @@ const UsersTab = ({ api }: { api: any }) => {
 // ===== TRANSACTIONS TAB =====
 const TransactionsTab = ({ api }: { api: any }) => {
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [unmatched, setUnmatched] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>({ page: 1, totalPages: 1 });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [targetUserId, setTargetUserId] = useState('');
+
+  const fetchUnmatched = useCallback(async () => {
+    try {
+      const res = await api('/api/admin/unmatched');
+      setUnmatched(res.data);
+    } catch (e) { console.error(e); }
+  }, [api]);
 
   const fetchTx = useCallback(async (page = 1) => {
     setLoading(true);
@@ -587,14 +597,92 @@ const TransactionsTab = ({ api }: { api: any }) => {
     setLoading(false);
   }, [api, search, statusFilter, typeFilter]);
 
-  useEffect(() => { fetchTx(); }, [fetchTx]);
+  const handleAssign = async (uId: string) => {
+    if (!targetUserId) return alert('Enter a User ID');
+    try {
+      await api('/api/admin/unmatched/assign', 'POST', { unmatchedId: uId, userId: targetUserId });
+      setAssigningId(null);
+      setTargetUserId('');
+      fetchUnmatched();
+      fetchTx();
+    } catch (e: any) { alert(e.response?.data?.error || 'Assignment failed'); }
+  };
+
+  useEffect(() => { fetchTx(); fetchUnmatched(); }, [fetchTx, fetchUnmatched]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-white tracking-tight">Transaction Explorer</h1>
-        <p className="text-[#8696a0] text-sm">{pagination.total || 0} total transactions</p>
+      <div className="flex justify-between items-end">
+        <div>
+          <h1 className="text-2xl font-black text-white tracking-tight">Transaction Explorer</h1>
+          <p className="text-[#8696a0] text-sm">{pagination.total || 0} total transactions</p>
+        </div>
+        {unmatched.length > 0 && (
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500">
+              <AlertCircle size={20} />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-500">{unmatched.length} Unmatched Deposits</p>
+              <p className="text-[10px] text-[#8696a0]">Found in Fincra but not linked to any user.</p>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Unmatched Section */}
+      {unmatched.length > 0 && (
+        <div className="bg-[#111b21] border border-[#222d34] rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#222d34] bg-white/[0.02] flex justify-between items-center">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <History size={16} className="text-amber-500" />
+              Reconciliation Queue
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-white/[0.01]">
+                  <th className="text-left text-[10px] font-bold text-[#8696a0] uppercase tracking-widest px-5 py-4">Reference</th>
+                  <th className="text-left text-[10px] font-bold text-[#8696a0] uppercase tracking-widest px-5 py-4">Amount</th>
+                  <th className="text-left text-[10px] font-bold text-[#8696a0] uppercase tracking-widest px-5 py-4">Sender Info</th>
+                  <th className="text-right text-[10px] font-bold text-[#8696a0] uppercase tracking-widest px-5 py-4">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unmatched.map((tx: any) => (
+                  <tr key={tx.id} className="border-b border-[#222d34]/50 hover:bg-white/[0.02]">
+                    <td className="px-5 py-4 text-xs font-mono text-white">{tx.reference}</td>
+                    <td className="px-5 py-4 font-bold text-[#25D366] text-sm">₦{tx.amount.toLocaleString()}</td>
+                    <td className="px-5 py-4 text-xs text-[#8696a0]">{tx.description}</td>
+                    <td className="px-5 py-4">
+                      {assigningId === tx.id ? (
+                        <div className="flex gap-2 justify-end items-center">
+                          <input 
+                            type="text" 
+                            placeholder="User ID..."
+                            className="bg-[#0b141a] border border-[#222d34] rounded px-2 py-1 text-xs text-white outline-none focus:border-[#25D366]"
+                            value={targetUserId}
+                            onChange={(e) => setTargetUserId(e.target.value)}
+                          />
+                          <button onClick={() => handleAssign(tx.id)} className="p-1 px-3 bg-[#25D366] text-white text-[10px] font-bold rounded">Confirm</button>
+                          <button onClick={() => setAssigningId(null)} className="p-1 px-3 bg-white/10 text-[#8696a0] text-[10px] font-bold rounded">Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-end">
+                          <button onClick={() => setAssigningId(tx.id)} className="text-[10px] font-bold text-[#25D366] flex items-center gap-1 hover:underline">
+                            <UserPlus size={12} /> Assign User
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Search & Filters */}
       <div className="flex gap-3 flex-wrap">

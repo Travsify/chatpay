@@ -47,6 +47,17 @@ model Transaction {
   createdAt   DateTime          @default(now())
 }
 
+model UnmatchedTransaction {
+  id          String   @id @default(uuid())
+  amount      Float
+  currency    String   @default("NGN")
+  reference   String   @unique
+  provider    String   
+  description String?
+  metadata    String?  @db.Text // Store raw JSON from Fincra
+  createdAt   DateTime @default(now())
+}
+
 // ===== SESSION STATE =====
 model Session {
   id           String   @id @default(uuid())
