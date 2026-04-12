@@ -2,13 +2,14 @@ import OpenAI from 'openai';
 import prisma from '../utils/prisma.js';
 
 export interface IntentResult {
-    intent: 'SIGNUP' | 'SEND_FUNDS' | 'PAY_BILL' | 'CHECK_BALANCE' | 'INVOICE' | 'CRYPTO' | 'CARD' | 'GIFTCARD' | 'OPEN_ACCOUNT' | 'SCHEDULE_TASK' | 'CONVERT' | 'GENERATE_VOUCHER' | 'REDEEM_VOUCHER' | 'UNKNOWN';
+    intent: 'SIGNUP' | 'SEND_FUNDS' | 'INTERNATIONAL_TRANSFER' | 'PAY_BILL' | 'CHECK_BALANCE' | 'INVOICE' | 'CRYPTO' | 'CARD' | 'GIFTCARD' | 'OPEN_ACCOUNT' | 'SCHEDULE_TASK' | 'CONVERT' | 'GENERATE_VOUCHER' | 'REDEEM_VOUCHER' | 'CHECK_BUDGET' | 'UNKNOWN';
     entities?: {
         amount?: number;
         recipient?: string;
         billType?: string;
         asset?: string;
         currency?: string;
+        country?: string;
         date?: string; // For scheduling
         priceCondition?: number; // For "Buy the Dip"
         recurring?: boolean;
@@ -52,13 +53,14 @@ export class AiService {
                 Extract intent, entities, and required ACTIONS.
                 We speak English, Pidgin, Yoruba, Igbo, and Hausa.
                 
-                Intents: SIGNUP, SEND_FUNDS, PAY_BILL, CHECK_BALANCE, INVOICE, CRYPTO, CARD, GIFTCARD, OPEN_ACCOUNT, SCHEDULE_TASK, CONVERT, UNKNOWN.
+                Intents: SIGNUP, SEND_FUNDS, INTERNATIONAL_TRANSFER, PAY_BILL, CHECK_BALANCE, INVOICE, CRYPTO, CARD, GIFTCARD, OPEN_ACCOUNT, SCHEDULE_TASK, CONVERT, UNKNOWN.
                 
                 Examples:
                 1. "Abeg pay 50k for light on Friday" -> { "intent": "SCHEDULE_TASK", "entities": { "amount": 50000, "billType": "Electricity", "date": "next Friday" }, "actions": ["SCHEDULE_BILL"] }
                 2. "Swap 20k to USDT and fund my card" -> { "intent": "CONVERT", "entities": { "amount": 20000, "asset": "USDT" }, "actions": ["SWAP", "FUND_CARD"] }
                 3. "If BTC fall enter $60k, buy me 10k" -> { "intent": "SCHEDULE_TASK", "entities": { "amount": 10000, "asset": "BTC", "priceCondition": 60000 }, "actions": ["AUTO_BUY"] }
                 4. "How much did I spend this week?" -> { "intent": "CHECK_BUDGET" }
+                5. "Send 500 cedis to Ghana" -> { "intent": "INTERNATIONAL_TRANSFER", "entities": { "amount": 500, "currency": "GHS", "country": "Ghana" } }
                 
                 Return JSON only.
             `;
