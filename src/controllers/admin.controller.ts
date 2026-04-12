@@ -114,6 +114,87 @@ export class AdminController {
     }
 
     // ===== DASHBOARD METRICS =====
+    // POST /api/admin/sync-fincra
+    static async syncFincra(req: AuthRequest, res: Response) {
+        try {
+            console.log('[Admin] Fetching global configuration for Fincra Sync...');
+            const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            const fincraSecret = config?.fincraSecret || process.env.FINCRA_SECRET_KEY;
+            const businessId = process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6';
+
+            if (!fincraSecret) {
+                return res.status(400).json({ error: 'No Fincra API Key found.' });
+            }
+
+            const axios = (await import('axios')).default;
+            const headers = { 'api-key': fincraSecret, 'x-business-id': businessId, 'Content-Type': 'application/json' };
+
+            const response = await axios.get('https://api.fincra.com/collections', { headers });
+            const collections = response.data.data?.result || response.data.data || [];
+
+            let inserted = 0;
+            let skipped = 0;
+            let page = 1;
+            let totalProcessed = 0;
+            const maxPages = 5; // Protect against infinite loops but allow substantial lookback
+
+            while (page <= maxPages) {
+                console.log(`[Admin] Syncing Fincra Collections Page ${page}...`);
+                const response = await axios.get(`https://api.fincra.com/collections?page=${page}&limit=50`, { headers });
+                const collections = response.data.data?.result || response.data.data || [];
+                
+                if (collections.length === 0) break;
+
+                for (const record of collections) {
+                    totalProcessed++;
+                    if (record.status !== 'successful' && record.status !== 'success') continue;
+
+                    const virtualAccountId = record.virtualAccount?.id || record.virtualAccountId || record.customer?.virtualAccount;
+                    const accountNumber = record.virtualAccount?.accountNumber || record.accountNumber || record.customer?.accountNumber;
+                    const amount = parseFloat(record.amount || record.settledAmount || '0');
+                    const currency = record.currency || 'NGN';
+                    const reference = record.reference;
+
+                    if (!reference) continue;
+
+                    const exists = await prisma.transaction.findUnique({ where: { reference } });
+                    if (exists) {
+                        skipped++;
+                        continue; // Keep checking this page in case of non-sequential reference syncing
+                    }
+
+                    let user = null;
+                    if (virtualAccountId) user = await prisma.user.findFirst({ where: { fincraCustomerId: String(virtualAccountId) } });
+                    if (!user && accountNumber) user = await prisma.user.findFirst({ where: { fincraWalletId: String(accountNumber) } });
+                    
+                    if (!user) continue;
+
+                    await prisma.transaction.create({
+                        data: {
+                            userId: user.id,
+                            type: 'FUNDING',
+                            amount: amount,
+                            currency: currency,
+                            status: 'SUCCESS',
+                            reference: reference, 
+                            provider: 'FINCRA_SYNC',
+                            description: `Deposit Sync (${record.sourceAccount?.accountNumber || 'External'})`
+                        }
+                    });
+                    inserted++;
+                }
+
+                // If most of the records on this page already exist, we've likely caught up
+                // But we'll keep going up to maxPages to be safe
+                page++;
+            }
+            res.json({ message: 'Sync complete', inserted, skipped, totalProcessed });
+        } catch (error: any) {
+            console.error('[Admin] Fincra Sync Error:', error.response?.data || error.message);
+            res.status(500).json({ error: error.response?.data?.message || error.message || 'Failed to sync from Fincra' });
+        }
+    }
+
     // GET /api/admin/metrics
     static async getMetrics(req: AuthRequest, res: Response) {
         try {

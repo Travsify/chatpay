@@ -1477,13 +1477,30 @@ const ApiVault = ({ api }: { api: any }) => {
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white py-3.5 rounded-xl font-bold text-sm transition-all hover:shadow-[0_0_20px_rgba(37,211,102,0.3)] disabled:opacity-50"
-        >
-          {saving ? 'Syncing...' : 'Save API Vault'}
-        </button>
+        <div className="flex gap-4">
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 bg-[#111b21] border border-[#25D366]/30 text-[#25D366] py-3.5 rounded-xl font-bold text-sm transition-all hover:bg-[#25D366]/10 disabled:opacity-50"
+          >
+            {saving ? 'Syncing...' : 'Save API Vault'}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                setMessage({ text: 'Syncing Fincra balances...', isError: false });
+                const res = await api('/api/admin/sync-fincra', { method: 'POST' });
+                setMessage({ text: `Success: Synced ${res.data.inserted} missing Fincra transactions.`, isError: false });
+              } catch (err: any) {
+                setMessage({ text: err.response?.data?.error || 'Failed to sync Fincra balances', isError: true });
+              }
+            }}
+            className="flex-1 bg-gradient-to-r from-[#25D366] to-[#128C7E] text-white py-3.5 rounded-xl font-bold text-sm transition-all hover:shadow-[0_0_20px_rgba(37,211,102,0.3)]"
+          >
+            Pull Missing Fincra Balances
+          </button>
+        </div>
       </form>
     </div>
   );
