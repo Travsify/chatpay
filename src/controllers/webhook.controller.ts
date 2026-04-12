@@ -22,7 +22,7 @@ export class WebhookController {
 
         const startTime = Date.now();
         try {
-            const body = req.body;
+            const body = req.body || {};
             const messages = body.messages || [];
             
             for (const msg of messages) {

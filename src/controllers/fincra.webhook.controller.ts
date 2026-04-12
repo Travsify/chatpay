@@ -7,7 +7,7 @@ import crypto from 'crypto';
 export class FincraWebhookController {
     static async handleIncoming(req: Request, res: Response) {
         try {
-            const payload = req.body;
+            const payload = req.body || {};
             const signature = req.headers['x-fincra-signature'];
             
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
