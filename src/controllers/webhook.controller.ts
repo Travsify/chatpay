@@ -338,7 +338,6 @@ export class WebhookController {
             const isVerified = user.kycStatus === 'VERIFIED' && user.fincraWalletId;
             
             if (!isVerified) {
-            if (!isVerified) {
                 const welcomeMsg = `👋 Welcome to ChatPay!\nI am your personal money assistant right here on WhatsApp.\n\nI can help you:\n🏦 *Bank:* Get local & dollar accounts\n🚀 *Send:* Transfer money locally & abroad\n💡 *Bills:* Pay airtime, data & electricity\n🎮 *Betting:* Fund your bet accounts instantly\n₿ *Crypto:* Trade Bitcoin & Dollar Cards\n🤝 *Trust:* Hold money safely (Escrow)\n\nTo get started, are you opening this account for *Yourself* or for a *Registered Business*?`;
                 const welcomeMenu = [
                     { id: "START_INDIVIDUAL", title: "👤 For Myself", description: "Personal local & global account" },
