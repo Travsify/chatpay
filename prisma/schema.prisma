@@ -51,10 +51,10 @@ model Transaction {
 // ===== SESSION STATE =====
 model Session {
   id           String   @id @default(uuid())
-  userId       String
+  userId       String   @unique
   user         User     @relation(fields: [userId], references: [id])
   currentState String   @default("START")
-  context      String? // JSON string for step-specific data
+  context      String?  @db.Text
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
@@ -77,9 +77,9 @@ model ConversationLog {
   userId     String
   user       User             @relation(fields: [userId], references: [id])
   direction  MessageDirection
-  message    String
+  message    String           @db.Text
   intent     String? // Detected AI intent
-  aiResponse String? // What the AI responded with
+  aiResponse String?          @db.Text
   confidence Float? // AI confidence score
   createdAt  DateTime         @default(now())
 }
@@ -89,9 +89,9 @@ model WebhookLog {
   id          String           @id @default(uuid())
   direction   MessageDirection
   phoneNumber String
-  payload     String // JSON payload
+  payload     String           @db.Text
   status      WebhookStatus    @default(RECEIVED)
-  errorMsg    String?
+  errorMsg    String?          @db.Text
   latencyMs   Int?
   createdAt   DateTime         @default(now())
 }
@@ -147,24 +147,28 @@ model SystemConfig {
 
 // ===== SCHEDULED TASKS (Automation) =====
 model ScheduledTask {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  taskType  String   // e.g., "BUY_THE_DIP"
-  params    String?  // JSON string of task parameters
-  status    String   @default("PENDING")
-  executeAt DateTime
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  type        String   // e.g., "BUY_THE_DIP", "TRANSFER"
+  amount      Float    @default(0)
+  currency    String   @default("NGN")
+  reference   String   @unique
+  status      String   @default("PENDING")
+  targetDate  DateTime
+  context     String?  @db.Text
+  createdAt   DateTime @default(now())
 }
 
 // ===== VOUCHERS (Minted Assets) =====
 model Voucher {
   id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  createdById String
+  user        User     @relation(fields: [createdById], references: [id])
   code        String   @unique
   amount      Float
   currency    String   @default("NGN")
+  status      String   @default("ACTIVE") // ACTIVE, REDEEMED, CANCELLED
   isRedeemed  Boolean  @default(false)
   redeemedAt  DateTime?
   createdAt   DateTime @default(now())
@@ -177,7 +181,7 @@ model BusinessKyb {
   user            User      @relation(fields: [userId], references: [id])
   cacNumber       String
   companyName     String?
-  directors       String?   // JSON array of verified directors
+  directors       String?   @db.Text
   status          KycStatus @default(PENDING)
   premblyRef      String?
   verifiedAt      DateTime?
@@ -198,6 +202,9 @@ enum TransactionType {
   BILL_PAYMENT
   AIRTIME
   FUNDING
+  TRANSFER
+  ESCROW
+  VOUCHER_REDEEM
 }
 
 enum TransactionStatus {
@@ -228,4 +235,5 @@ enum WebhookStatus {
   PROCESSED
   FAILED
 }
+
 

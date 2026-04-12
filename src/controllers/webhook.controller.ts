@@ -7,6 +7,8 @@ import { bitnobService } from '../services/bitnob.service.js';
 import { pressMntService } from '../services/pressmnt.service.js';
 import { VoiceService } from '../services/voice.service.js';
 import { EmailService } from '../services/email.service.js';
+import { fincraService } from '../services/fincra.service.js';
+import { mapleradService } from '../services/maplerad.service.js';
 import prisma from '../utils/prisma.js';
 import fs from 'fs';
 import path from 'path';
@@ -201,7 +203,7 @@ export class WebhookController {
     private static async processLogic(user: any, session: any, aiResult: any, rawInput: string, isAudio: boolean = false) {
         const { phoneNumber } = user;
         let rawText = rawInput;
-        const context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
+        let context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
 
         // Direct ID to Intent Mapping for native UI reliability
         const directMapping: Record<string, string> = {
@@ -1355,7 +1357,7 @@ export class WebhookController {
                 if (history.length === 0) {
                     const welcomeMsg = `🤖 *Meet Your ChatPay AI Agent* 🤖\n\nI am your new autonomous financial guardian. I don't just "bank"—I **execute missions** for you.\n\n✨ *What I can do right now:*\n\n🛡️ **Escrow**: I can hold funds for your IG/Jiji purchases until you get your item.\n📈 **Auto-Buy**: I can watch the market and buy Bitcoin for you while you sleep.\n📄 **Invoice Scraper**: Just forward any bill to me, and I'll pay it.\n🤝 **Social Lending**: I'll nudge your friends to pay you back so you don't have to.\n🎁 **Gift Codes**: Generate branded vouchers you can share with anyone.\n\nType *"Menu"* to see your vault, or just **talk to me** to launch a mission!`;
         
-                    await whapiService.sendImage(senderNumber, 'https://chatpay-l4ej.onrender.com/assets/agent_welcome.png', welcomeMsg);
+                    await whapiService.sendImage(user.phoneNumber, 'https://chatpay-l4ej.onrender.com/assets/agent_welcome.png', welcomeMsg);
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'MAIN_MENU' } });
                     return;
                 } else {
@@ -1372,7 +1374,7 @@ export class WebhookController {
                     const msg = `🔍 *Invoice Detected*\n\nI have read the document you sent:\n\n*Recipient*: ${data.BeneficiaryName || 'N/A'}\n*Bank*: ${data.BankName || 'N/A'}\n*Account*: ${data.AccountNumber || 'N/A'}\n*Amount*: ₦${parseFloat(data.Amount || '0').toLocaleString()}\n\nWhat should I do?`;
                     
                     await prisma.session.update({ where: { id: session.id }, data: { context: JSON.stringify(data) } });
-                    await whapiService.sendButtons(senderNumber, msg, [
+                    await whapiService.sendButtons(user.phoneNumber, msg, [
                         { id: 'CONFIRM_DOCUMENT_PAY', title: '✅ Pay Now' },
                         { id: 'HOME', title: '🏠 Cancel' }
                     ]);

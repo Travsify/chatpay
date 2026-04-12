@@ -1,7 +1,7 @@
-import PDFDocument from 'pdfkit';
+import PDFDocument = require('pdfkit');
 import fs from 'fs';
 import path from 'path';
-import { whapiService } from './whapi.service';
+import { whapiService } from './whapi.service.js';
 
 export class ReceiptService {
     /**
