@@ -281,9 +281,17 @@ export class WhapiService {
             const response = await axios.get(`${apiUrl}/health`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            return response.data;
+            // Normalize Whapi response: status.text === 'AUTH' means authenticated
+            const data = response.data || {};
+            const isAuth = data.status?.text === 'AUTH' || data.status?.code === 4;
+            return {
+                ...data,
+                authenticated: isAuth,
+                status: isAuth ? 'CONNECTED' : (data.status?.text || 'UNKNOWN'),
+                phoneNumber: data.user?.id || null
+            };
         } catch (error: any) {
-             return { status: 'ERROR' };
+            return { status: 'ERROR', authenticated: false, error: error.response?.data?.message || error.message };
         }
     }
 }

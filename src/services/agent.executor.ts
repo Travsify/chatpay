@@ -9,7 +9,6 @@ export class AgentExecutor {
      * The background engine that processes all PENDING missions in the Task Ledger.
      */
     static async processMissions() {
-        console.log('[Agent Executor] Scanning for active missions...');
         
         try {
             const pendingTasks = await prisma.scheduledTask.findMany({

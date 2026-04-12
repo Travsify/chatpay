@@ -638,7 +638,7 @@ export class AdminController {
             const whapiHealth = await whapiService.getChannelHealth();
 
             res.json({
-                status: (whapiHealth.status === 'ERROR' || !whapiHealth.authenticated) ? 'DEGRADED' : 'OPERATIONAL',
+                status: (!whapiHealth.authenticated) ? 'DEGRADED' : 'OPERATIONAL',
                 dbLatencyMs: dbLatency,
                 activeSessions,
                 lastWebhook: lastWebhook ? {

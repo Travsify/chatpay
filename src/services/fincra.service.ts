@@ -17,8 +17,6 @@ export class FincraService {
         
         if (!apiKey) {
             console.error('[Fincra] CRITICAL: No API Key found in DB or Environment!');
-        } else {
-            console.log(`[Fincra] Using API Key: ${apiKey.substring(0, 8)}... (Length: ${apiKey.length})`);
         }
 
         return {

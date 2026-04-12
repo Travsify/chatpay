@@ -17,10 +17,6 @@ import crypto from 'crypto';
 export class WebhookController {
     
     static async handleIncoming(req: Request, res: Response) {
-        // DIAGNOSTIC: Log outbound IP for Fincra whitelisting
-        axios.get('https://api.ipify.org')
-            .then(res => console.log(`[DIAGNOSTIC] Server Outbound IP: ${res.data}`))
-            .catch(() => {});
 
         const startTime = Date.now();
         try {
@@ -1540,29 +1536,86 @@ export class WebhookController {
                 break;
 
             case 'CONVERT':
-                if (user.kycStatus !== 'VERIFIED') {
-                    await sendAndLog(`Verify first to swap currencies.`, 'UNVERIFIED_ATTEMPT');
-                } else {
-                    const { amount, from, to } = aiResult.entities || {};
-                    if (!amount) {
-                        await sendAndLog(`Please specify the amount you want to swap (e.g. "Swap 50k to USD")`, 'MISSING_ENTITIES');
-                    } else {
-                        const source = (from || 'NGN').toUpperCase();
-                        const dest = (to || 'USD').toUpperCase();
+                {
+                    const { amount: convAmount, currency: convCurrency } = aiResult.entities || {};
+                    const source = 'NGN';
+                    const dest = (convCurrency || 'USD').toUpperCase();
+                    
+                    // Smart rate lookup: Try Fincra first, fallback to free API
+                    try {
+                        let rate: number | null = null;
+                        let receiveAmount: string | null = null;
+                        let quoteRef: string | null = null;
+                        let usedFincra = false;
+                        
+                        // Attempt 1: Fincra Quotes API
                         try {
-                            const quote = await fincraService.createConversionQuote(parseFloat(String(amount)), source, dest);
-                            const rate = quote.data?.rate;
-                            const receiveAmount = quote.data?.destinationAmount;
-                            const quoteRef = quote.data?.reference;
-
-                            const msg = `💱 *Currency Conversion*\n\nRate: 1 ${dest} = ${rate} ${source}\nSwap: ${parseFloat(String(amount)).toLocaleString()} ${source}\nReceive: *${receiveAmount} ${dest}*\n\nProceed with this swap?`;
-                            await whapiService.sendButtons(phoneNumber, msg, [
-                                { id: `EXECUTE_SWAP:${quoteRef}`, title: "✅ Yes, Swap Now" },
-                                { id: "HOME", title: "❌ Cancel" }
-                            ]);
-                        } catch (e: any) {
-                            await sendAndLog(`Quote failed: ${e.message}`, 'SWAP_ERROR');
+                            const quote = await fincraService.createConversionQuote(
+                                parseFloat(String(convAmount || 1)), source, dest
+                            );
+                            rate = quote.data?.rate;
+                            receiveAmount = quote.data?.destinationAmount;
+                            quoteRef = quote.data?.reference;
+                            usedFincra = true;
+                        } catch (fincraErr: any) {
+                            console.log('[Convert] Fincra quote unavailable, using free rate API...');
                         }
+                        
+                        // Attempt 2: Free Exchange Rate API
+                        if (!rate) {
+                            try {
+                                const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+                                
+                                // Check if admin has set a manual rate
+                                if (dest === 'USD' && config?.usdExchangeRate && config.usdExchangeRate > 0) {
+                                    rate = config.usdExchangeRate + (config.usdMarkup || 0);
+                                } else if (dest === 'EUR' && config?.eurMarkup) {
+                                    // Use free API for EUR
+                                    const rateRes = await axios.get(`https://open.er-api.com/v6/latest/${source}`);
+                                    const apiRate = rateRes.data?.rates?.[dest];
+                                    if (apiRate) rate = 1 / apiRate;
+                                } else if (dest === 'GBP' && config?.gbpMarkup) {
+                                    const rateRes = await axios.get(`https://open.er-api.com/v6/latest/${source}`);
+                                    const apiRate = rateRes.data?.rates?.[dest];
+                                    if (apiRate) rate = 1 / apiRate;
+                                } else {
+                                    // Generic: fetch from free API
+                                    const rateRes = await axios.get(`https://open.er-api.com/v6/latest/${dest}`);
+                                    rate = rateRes.data?.rates?.[source] || null;
+                                }
+                                
+                                if (rate && convAmount) {
+                                    receiveAmount = (parseFloat(String(convAmount)) / rate).toFixed(2);
+                                }
+                            } catch (apiErr) {
+                                console.error('[Convert] Free rate API also failed:', apiErr);
+                            }
+                        }
+                        
+                        if (rate) {
+                            if (convAmount) {
+                                const numAmount = parseFloat(String(convAmount));
+                                if (!receiveAmount) receiveAmount = (numAmount / rate).toFixed(2);
+                                
+                                const msg = `💱 *Currency Exchange Rate*\n\n1 ${dest} = ₦${rate.toLocaleString()} ${source}\n\n💰 *Your Conversion:*\n${numAmount.toLocaleString()} ${source} ≈ *${receiveAmount} ${dest}*${usedFincra && quoteRef ? '\n\nProceed with this swap?' : ''}`;
+                                
+                                if (usedFincra && quoteRef) {
+                                    await whapiService.sendButtons(phoneNumber, msg, [
+                                        { id: `EXECUTE_SWAP:${quoteRef}`, title: "✅ Yes, Swap Now" },
+                                        { id: "HOME", title: "❌ Cancel" }
+                                    ]);
+                                } else {
+                                    await sendAndLog(msg, 'RATE_INFO');
+                                }
+                            } else {
+                                // Just rate inquiry, no amount specified
+                                await sendAndLog(`💱 *Exchange Rate*\n\n1 ${dest} = ₦${rate.toLocaleString()} NGN\n\nWant to convert? Tell me the amount (e.g. "Swap 50k to ${dest}")`, 'RATE_INFO');
+                            }
+                        } else {
+                            await sendAndLog(`Sorry, I couldn't fetch the ${source}/${dest} rate right now. Please try again shortly.`, 'RATE_UNAVAILABLE');
+                        }
+                    } catch (e: any) {
+                        await sendAndLog(`Rate lookup failed: ${e.message}`, 'SWAP_ERROR');
                     }
                 }
                 break;
