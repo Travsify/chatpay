@@ -28,8 +28,9 @@ export class SyncService {
 
             while (page <= depth) {
                 console.log(`[SyncService] Fetching Fincra Page ${page}...`);
-                // Standard collections endpoint with business filter to avoid 422
-                const response = await axios.get(`https://api.fincra.com/collections?business=${businessId}&page=${page}&limit=20`, { headers });
+                // Using /core/collections (V2) which is more reliable for newer accounts
+                const url = `https://api.fincra.com/core/collections?page=${page}&limit=20&business=${businessId}`;
+                const response = await axios.get(url, { headers });
                 const rawData = response.data.data;
                 const collections = Array.isArray(rawData) ? rawData : (rawData?.result || []);
                 
