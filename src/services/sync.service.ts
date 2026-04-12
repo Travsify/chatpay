@@ -26,9 +26,9 @@ export class SyncService {
             let skipped = 0;
             let page = 1;
 
+            // 1. SYNC COLLECTIONS (Incoming)
             while (page <= depth) {
-                console.log(`[SyncService] Fetching Fincra Page ${page}...`);
-                // Standard collections endpoint (V1) is often just /collections
+                console.log(`[SyncService] Fetching Fincra Collections Page ${page}...`);
                 const url = `https://api.fincra.com/collections?business=${businessId}&page=${page}&perPage=20`;
                 const response = await axios.get(url, { headers });
                 const rawData = response.data.data;
@@ -42,24 +42,26 @@ export class SyncService {
                     const reference = record.reference;
                     if (!reference) continue;
 
-                    // Check if already synced
-                    const exists = await prisma.transaction.findUnique({ where: { reference } });
-                    if (exists) {
+                    if (await prisma.transaction.findUnique({ where: { reference } })) {
                         skipped++;
                         continue;
                     }
 
-                    // Identify user
-                    const virtualAccountId = record.virtualAccount?.id || record.virtualAccountId || record.customer?.virtualAccount;
-                    const accountNumber = record.virtualAccount?.accountNumber || record.accountNumber || record.customer?.accountNumber;
+                    // Flexible ID matching
+                    const vId = typeof record.virtualAccount === 'object' ? record.virtualAccount?.id : record.virtualAccount;
+                    const vAcc = typeof record.virtualAccount === 'object' ? record.virtualAccount?.accountNumber : record.accountNumber;
 
-                    let user = null;
-                    if (virtualAccountId) user = await prisma.user.findFirst({ where: { fincraCustomerId: String(virtualAccountId) } });
-                    if (!user && accountNumber) user = await prisma.user.findFirst({ where: { fincraWalletId: String(accountNumber) } });
+                    const user = await prisma.user.findFirst({
+                        where: {
+                            OR: [
+                                { fincraCustomerId: String(vId || 'none') },
+                                { fincraWalletId: String(vAcc || 'none') }
+                            ]
+                        }
+                    });
                     
                     if (!user) continue;
 
-                    // Create transaction record
                     await prisma.transaction.create({
                         data: {
                             userId: user.id,
@@ -75,6 +77,54 @@ export class SyncService {
                     inserted++;
                 }
                 page++;
+            }
+
+            // 2. SYNC DISBURSEMENTS (Outgoing)
+            let dPage = 1;
+            while (dPage <= Math.min(depth, 5)) { // Payouts are usually fewer, scan less depth by default
+                console.log(`[SyncService] Fetching Fincra Payouts Page ${dPage}...`);
+                const dUrl = `https://api.fincra.getfincra.com/disbursements?business=${businessId}&page=${dPage}&perPage=20`;
+                try {
+                    const dRes = await axios.get(dUrl.replace('.getfincra.com', '.com'), { headers });
+                    const dData = dRes.data.data?.result || dRes.data.data || [];
+                    if (dData.length === 0) break;
+
+                    for (const record of dData) {
+                        if (record.status !== 'successful' && record.status !== 'success' && record.status !== 'processed') continue;
+                        
+                        const reference = record.reference;
+                        if (!reference || await prisma.transaction.findUnique({ where: { reference } })) continue;
+
+                        // Try to find user by merchant reference pattern (e.g. chatpay-USERID-ngn)
+                        const merchantRef = record.customerReference || record.merchantReference || '';
+                        let userId = null;
+                        if (merchantRef.startsWith('chatpay-')) {
+                            const parts = merchantRef.split('-');
+                            if (parts[1]) {
+                                const partialId = parts[1];
+                                const userMatch = await prisma.user.findFirst({ where: { id: { startsWith: partialId } } });
+                                userId = userMatch?.id;
+                            }
+                        }
+
+                        if (!userId) continue;
+
+                        await prisma.transaction.create({
+                            data: {
+                                userId,
+                                type: 'TRANSFER',
+                                amount: parseFloat(record.amount || '0'),
+                                currency: record.currency || 'NGN',
+                                status: 'SUCCESS',
+                                reference: reference,
+                                provider: 'FINCRA_SYNC_OUT',
+                                description: `Payout Sync (${record.beneficiary?.accountNumber || 'External'})`
+                            }
+                        });
+                        inserted++;
+                    }
+                } catch (e) { break; }
+                dPage++;
             }
 
             return { inserted, skipped, pages: page - 1 };
