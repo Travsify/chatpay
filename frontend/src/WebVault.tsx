@@ -4,10 +4,15 @@ import { Send, Paperclip, MoreVertical, Search, CheckCheck, ChevronLeft, ShieldC
 
 interface Message {
     id: string;
-    text: string;
+    text?: string;
     sender: 'user' | 'agent';
     timestamp: string;
     status: 'sent' | 'delivered' | 'read';
+    type: 'text' | 'buttons' | 'list' | 'image';
+    buttons?: any[];
+    sections?: any[];
+    title?: string;
+    mediaUrl?: string;
 }
 
 const WebVault = () => {
@@ -17,7 +22,7 @@ const WebVault = () => {
     const [step, setStep] = useState<'PHONE' | 'OTP'>('PHONE');
     const [loading, setLoading] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', text: '🤖 *Status: Agent Active*\n\nWelcome to your Secure Web Vault. I am standing by for your next mission.', sender: 'agent', timestamp: '10:00 AM', status: 'read' }
+        { id: '1', text: '🤖 *Status: Agent Active*\n\nWelcome to your Secure Web Vault. I am standing by for your next mission.', sender: 'agent', timestamp: '10:00 AM', status: 'read', type: 'text' }
     ]);
     const [inputText, setInputText] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -57,18 +62,20 @@ const WebVault = () => {
         setLoading(false);
     };
 
-    const handleSend = async () => {
-        if (!inputText.trim()) return;
-        const msgText = inputText;
+    const handleSend = async (forcedText?: string) => {
+        const msgText = forcedText || inputText;
+        if (!msgText.trim()) return;
+        
         const newMessage: Message = {
             id: Date.now().toString(),
             text: msgText,
             sender: 'user',
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            status: 'sent'
+            status: 'sent',
+            type: 'text'
         };
-        setMessages([...messages, newMessage]);
-        setInputText('');
+        setMessages(prev => [...prev, newMessage]);
+        if (!forcedText) setInputText('');
 
         try {
             const res = await fetch('/api/vault/message', {
@@ -77,16 +84,26 @@ const WebVault = () => {
                 body: JSON.stringify({ phoneNumber, message: msgText })
             });
             const data = await res.json();
-            if (data.response) {
-                setMessages(prev => [...prev, {
-                    id: (Date.now() + 1).toString(),
-                    text: data.response,
-                    sender: 'agent',
+            if (data.responses && Array.isArray(data.responses)) {
+                const newRxs = data.responses.map((r: any, i: number) => ({
+                    id: (Date.now() + i + 1).toString(),
+                    text: r.body || r.caption,
+                    sender: 'agent' as const,
                     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    status: 'read'
-                }]);
+                    status: 'read' as const,
+                    type: r.type,
+                    buttons: r.buttons,
+                    sections: r.sections,
+                    title: r.title,
+                    mediaUrl: r.url
+                }));
+                setMessages(prev => [...prev, ...newRxs]);
             }
         } catch (e) { console.error(e); }
+    };
+
+    const handleInteraction = (id: string, text: string) => {
+        handleSend(id); // Send the ID back as the message, but we might want to show the text in the UI
     };
 
     if (!isSynced) {
@@ -216,9 +233,55 @@ const WebVault = () => {
                                     : 'bg-[#202c33] rounded-tl-none border-l-2 border-[#00a884]'
                                 }`}
                             >
-                                <p className="text-[14.5px] whitespace-pre-wrap leading-relaxed pr-8">
-                                    {msg.text}
-                                </p>
+                                {msg.type === 'image' && msg.mediaUrl && (
+                                    <div className="mb-2 rounded-lg overflow-hidden border border-white/5">
+                                        <img src={msg.mediaUrl} alt="Media" className="w-full object-cover max-h-64" />
+                                    </div>
+                                )}
+
+                                {msg.text && (
+                                    <p className="text-[14.5px] whitespace-pre-wrap leading-relaxed pr-8">
+                                        {msg.text}
+                                    </p>
+                                )}
+
+                                {msg.type === 'buttons' && msg.buttons && (
+                                    <div className="mt-3 flex flex-col gap-2">
+                                        {msg.buttons.map((btn: any) => (
+                                            <button 
+                                                key={btn.id}
+                                                onClick={() => handleInteraction(btn.id, btn.title)}
+                                                className="w-full py-2.5 px-4 bg-white/5 hover:bg-[#00a884]/20 border border-white/10 rounded-xl text-[13px] font-bold text-[#00a884] transition-colors active:scale-[0.98]"
+                                            >
+                                                {btn.title}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {msg.type === 'list' && msg.sections && (
+                                    <div className="mt-3 bg-[#111b21] rounded-xl overflow-hidden border border-white/10">
+                                        {msg.title && <div className="p-3 bg-white/5 border-b border-white/10 text-xs font-bold uppercase tracking-wider text-[#8696a0]">{msg.title}</div>}
+                                        <div className="max-h-48 overflow-y-auto">
+                                            {msg.sections.map((section: any, si: number) => (
+                                                <div key={si}>
+                                                    {section.title && <div className="px-3 py-1 bg-white/5 text-[10px] uppercase font-bold text-[#8696a0]">{section.title}</div>}
+                                                    {section.rows?.map((row: any) => (
+                                                        <button 
+                                                            key={row.id}
+                                                            onClick={() => handleInteraction(row.id, row.title)}
+                                                            className="w-full p-3 text-left hover:bg-[#00a884]/10 border-b border-white/5 transition-colors group flex flex-col gap-0.5"
+                                                        >
+                                                            <div className="text-[13px] font-bold text-white group-hover:text-[#00a884]">{row.title}</div>
+                                                            {row.description && <div className="text-[11px] text-[#8696a0]">{row.description}</div>}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="flex items-center justify-end gap-1 mt-1">
                                     <span className="text-[10px] text-white/50">{msg.timestamp}</span>
                                     {msg.sender === 'user' && (

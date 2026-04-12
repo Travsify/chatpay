@@ -14,6 +14,13 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
+interface MessagingProvider {
+    sendMessage(to: string, body: string): Promise<any>;
+    sendButtons?(to: string, body: string, buttons: any[]): Promise<any>;
+    sendList?(to: string, body: string, title: string, buttonText: string, sections: any[]): Promise<any>;
+    sendImage?(to: string, mediaUrl: string, caption?: string): Promise<any>;
+}
+
 export class WebhookController {
     
     static async handleIncoming(req: Request, res: Response) {
@@ -170,7 +177,7 @@ export class WebhookController {
 
                 console.log(`\n💬 [CONVERSATION] INBOUND from ${user.phoneNumber}:\n   "${rawText}"\n   Intent: ${aiResult.intent}`);
 
-                await WebhookController.processLogic(user, session, aiResult, rawText, isAudio);
+                await WebhookController.processLogic(user, session, aiResult, rawText, whapiService as any, isAudio);
 
                 // Mark processed
                 await WebhookController.logWebhook('INBOUND', senderNumber, '', 'PROCESSED', Date.now() - startTime);
@@ -229,21 +236,24 @@ export class WebhookController {
         if (!user) return res.status(404).json({ error: 'Access Denied' });
 
         const session = await prisma.session.findFirst({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } });
+        if (!session) return res.status(404).json({ error: 'Session not found' });
+
         const aiResult = await aiService.parseIntent(message);
         
-        // Pass dummy sendAndLog that returns response to web
-        let responseText = '';
-        const mockSendAndLog = async (msg: string) => { responseText = msg; };
+        const collected: any[] = [];
+        const webProvider: MessagingProvider = {
+            sendMessage: async (to, body) => { collected.push({ type: 'text', body }); },
+            sendButtons: async (to, body, buttons) => { collected.push({ type: 'buttons', body, buttons }); },
+            sendList: async (to, body, title, buttonText, sections) => { collected.push({ type: 'list', body, title, buttonText, sections }); },
+            sendImage: async (to, url, caption) => { collected.push({ type: 'image', url, caption }); }
+        };
 
-        // Redirect to processLogic but capture output
-        // (This would need significant refactoring of processLogic to return 
-        // string instead of calling whapiService directly)
-        // For now, we'll let it process and return AI's thoughts
+        await WebhookController.processLogic(user, session, aiResult, message, webProvider);
         
-        res.json({ success: true, response: responseText || "Mission Received. I'm working on it!" });
+        res.json({ success: true, responses: collected });
     }
 
-    private static async processLogic(user: any, session: any, aiResult: any, rawInput: string, isAudio: boolean = false) {
+    private static async processLogic(user: any, session: any, aiResult: any, rawInput: string, provider: MessagingProvider, isAudio: boolean = false) {
         const { phoneNumber } = user;
         let rawText = rawInput;
         let context = typeof session.context === 'string' ? JSON.parse(session.context) : (session.context || {});
@@ -270,22 +280,21 @@ export class WebhookController {
         const sendAndLog = async (message: string, intent?: string) => {
             if (message.includes('Success! 🛡️ Your USD Virtual Card is active.')) {
                 try {
-                    await whapiService.sendButtons(phoneNumber, message, [{ id: "MY_CARDS", title: "📂 View Card Details" }, { id: "HOME", title: "🏠 Home" }]);
+                    await provider.sendButtons!(phoneNumber, message, [{ id: "MY_CARDS", title: "📂 View Card Details" }, { id: "HOME", title: "🏠 Home" }]);
                 } catch (e) {
-                    await whapiService.sendMessage(phoneNumber, message);
+                    await provider.sendMessage(phoneNumber, message);
                 }
             } else {
                 // ALWAYS send text first for safety, record-keeping, and searchability
-                await whapiService.sendMessage(phoneNumber, message);
+                await provider.sendMessage(phoneNumber, message);
 
                 // If user used voice, we respond with voice as well for that premium concierge feel
-                if (isAudio) {
+                if (isAudio && (provider as any).sendAudio) {
                     try {
                         const audioBuffer = await VoiceService.textToSpeech(message);
-                        await whapiService.sendAudio(phoneNumber, audioBuffer);
+                        await (provider as any).sendAudio(phoneNumber, audioBuffer);
                     } catch (e) {
                         console.error('[Voice Response Error]:', e);
-                        // We already sent the text, so no need to fallback to text here
                     }
                 }
             }
@@ -330,7 +339,7 @@ export class WebhookController {
             await prisma.user.update({ where: { id: user.id }, data: { name: null, kycStatus: 'PENDING', fincraWalletId: null, fincraCustomerId: null, transactionPin: null } });
             
             const restartMsg = "✨ *ChatPay Home:* Your session has been reset. You've been brought back to the main menu. Say 'Hi' to continue.";
-            await whapiService.sendMessage(phoneNumber, restartMsg);
+            await provider.sendMessage(phoneNumber, restartMsg);
             return;
         }
 
@@ -552,7 +561,7 @@ export class WebhookController {
                 await sendAndLog(`Transaction cancelled. ❌`, 'TRANSFER_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else if (rawText === 'REFRESH') {
-                await whapiService.sendButtons(phoneNumber, `Send ₦${amount} to ${recipient}? 💸`, [
+                await provider.sendButtons!(phoneNumber, `Send ₦${amount} to ${recipient}? 💸`, [
                     { id: "CONFIRM_TX", title: "✅ Yes, Send" },
                     { id: "CANCEL_TX", title: "❌ No, Cancel" },
                     { id: "HOME", title: "🏠 Home" }
@@ -729,7 +738,7 @@ export class WebhookController {
                 await sendAndLog(`Payment cancelled. ❌`, 'BILL_CANCELLED');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             } else if (rawText === 'REFRESH') {
-                await whapiService.sendButtons(phoneNumber, `Pay ₦${amount} for ${billType}? 💡`, [
+                await provider.sendButtons!(phoneNumber, `Pay ₦${amount} for ${billType}? 💡`, [
                     { id: "CONFIRM_BILL", title: "✅ Yes, Pay" },
                     { id: "CANCEL_BILL", title: "❌ No, Cancel" },
                     { id: "HOME", title: "🏠 Home" }
@@ -765,7 +774,7 @@ export class WebhookController {
                 { id: "FUND_GBP", title: "🇬🇧 Fund GBP", description: "Get your UK banking details" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ];
-            await whapiService.sendList(phoneNumber, `🏦 *Fund Your Wallet*\n\nSelect the currency you'd like to fund:`, "Select Currency", menu);
+            await provider.sendList!(phoneNumber, `🏦 *Fund Your Wallet*\n\nSelect the currency you'd like to fund:`, "Select Currency", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'FUND_WALLET', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
@@ -773,7 +782,7 @@ export class WebhookController {
         if (rawText === 'FUND_NGN') {
             const balance = await WalletService.getBalance(user.id);
             const msg = `🇳🇬 *Your NGN Bank Details*\n\n*Bank*: WEMA BANK\n*Account Number*: ${user.fincraWalletId || 'PENDING'}\n*Account Name*: ${user.name}\n\nBalance: ₦${balance.toLocaleString()}\n\n_Transfer funds to this account to top up instantly._`;
-            await whapiService.sendList(phoneNumber, msg, "Options", [
+            await provider.sendList!(phoneNumber, msg, "Options", [
                 { id: "CHECK_BALANCE", title: "💰 Refresh Balance", description: "See current funds" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
@@ -782,7 +791,7 @@ export class WebhookController {
 
         if (rawText === 'CARD_MENU' || rawText === 'REFRESH' && session.currentState === 'CARD_MENU') {
             const cardTxt = `💳 *Virtual Cards*\n\nManage your global shopping cards:`;
-            await whapiService.sendList(phoneNumber, cardTxt, "Card Services", [
+            await provider.sendList!(phoneNumber, cardTxt, "Card Services", [
                 { id: "CREATE_CARD", title: "✨ Create New Card", description: "Generate a USD Master/Visa card" },
                 { id: "MY_CARDS", title: "📂 View My Cards", description: "See active cards & balances" },
                 { id: "TOPUP_CARD", title: "💰 Top Up Card", description: "Add funds to your virtual card" },
@@ -804,7 +813,7 @@ export class WebhookController {
                     lastName: names[1] || 'User'
                 });
                 const msg = `Success! 🛡️ Your Premium USD Virtual Card is active.\n\n*Type*: Visa (Bitnob Premium)\n*Balance*: $5.00\n*Status*: ACTIVE\n\n_Check your card details in the specialized Card Dashboard._`;
-                await whapiService.sendButtons(phoneNumber, msg, [{ id: "MY_CARDS", title: "📂 View Card Details" }, { id: "HOME", title: "🏠 Home" }]);
+                await provider.sendButtons!(phoneNumber, msg, [{ id: "MY_CARDS", title: "📂 View Card Details" }, { id: "HOME", title: "🏠 Home" }]);
             } catch (e: any) {
                 await sendAndLog(`Card issuance failed: ${e.message}`, 'CARD_FAILED');
             }
@@ -816,14 +825,14 @@ export class WebhookController {
             try {
                 const cards = await mapleradService.getCards(user.id);
                 if (!cards || cards.length === 0) {
-                    await whapiService.sendButtons(phoneNumber, `You don't have any virtual cards yet. 💳`, [{ id: "CREATE_CARD", title: "✨ Create New Card" }, { id: "HOME", title: "🏠 Home" }]);
+                    await provider.sendButtons!(phoneNumber, `You don't have any virtual cards yet. 💳`, [{ id: "CREATE_CARD", title: "✨ Create New Card" }, { id: "HOME", title: "🏠 Home" }]);
                 } else {
                     let msg = `💳 *Your Virtual Cards*\n\n`;
                     cards.forEach((c: any, i: number) => {
                         msg += `${i+1}. *${c.name || 'USD Card'}* (**** ${c.last4})\nStatus: ${c.status}\nBalance: $${(c.balance / 100).toFixed(2)}\n\n`;
                     });
                     msg += `_To see full details (CVV/Expiry), please use the God Mode dashboard for now for your security._`;
-                    await whapiService.sendButtons(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
+                    await provider.sendButtons!(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
                 }
             } catch (e: any) {
                 await sendAndLog(`Failed to fetch cards: ${e.message}`, 'CARDS_FETCH_FAILED');
@@ -840,7 +849,7 @@ export class WebhookController {
                 { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ];
-            await whapiService.sendList(phoneNumber, `💡 *Bill Payments & Utilities*\n\nSelect a category to pay for:`, "Bill Categories", menu);
+            await provider.sendList!(phoneNumber, `💡 *Bill Payments & Utilities*\n\nSelect a category to pay for:`, "Bill Categories", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'PAY_BILLS', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
@@ -853,7 +862,7 @@ export class WebhookController {
                 { id: "AIRTIME_9MOBILE", title: "9Mobile", description: "Etisalat evolution" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
             ];
-            await whapiService.sendList(phoneNumber, `📱 *Airtime Recharge*\n\nSelect your network provider:`, "Network Providers", menu);
+            await provider.sendList!(phoneNumber, `📱 *Airtime Recharge*\n\nSelect your network provider:`, "Network Providers", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AIRTIME_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
@@ -866,7 +875,7 @@ export class WebhookController {
                 { id: "DATA_9MOBILE", title: "9Mobile Data", description: "Secure bundles" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
             ];
-            await whapiService.sendList(phoneNumber, `📶 *Internet Data Bundles*\n\nSelect your network provider:`, "Network Providers", menu);
+            await provider.sendList!(phoneNumber, `📶 *Internet Data Bundles*\n\nSelect your network provider:`, "Network Providers", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'DATA_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
@@ -879,7 +888,7 @@ export class WebhookController {
                 { id: "UTIL_PHEDC", title: "PHEDC", description: "Port Harcourt Electricity" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
             ];
-            await whapiService.sendList(phoneNumber, `⚡ *Electricity & Utilities*\n\nSelect your distribution company (Disco):`, "Power Companies", menu);
+            await provider.sendList!(phoneNumber, `⚡ *Electricity & Utilities*\n\nSelect your distribution company (Disco):`, "Power Companies", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'UTILITIES_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
@@ -891,7 +900,7 @@ export class WebhookController {
                 { id: "TV_STARTIMES", title: "StarTimes", description: "Affordable cable" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
             ];
-            await whapiService.sendList(phoneNumber, `📺 *Cable TV Subscriptions*\n\nSelect your service provider:`, "TV Providers", menu);
+            await provider.sendList!(phoneNumber, `📺 *Cable TV Subscriptions*\n\nSelect your service provider:`, "TV Providers", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'CABLE_TV_MENU', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'PAY_BILLS' }) }});
             return;
         }
@@ -919,7 +928,7 @@ export class WebhookController {
             }
 
             const billType = context.billProvider || 'Airtime';
-            await whapiService.sendButtons(phoneNumber, `Confirm: Pay ₦${billAmount.toLocaleString()} for *${billType}* to ${customerIdentifier}? 💡`, [
+            await provider.sendButtons!(phoneNumber, `Confirm: Pay ₦${billAmount.toLocaleString()} for *${billType}* to ${customerIdentifier}? 💡`, [
                 { id: "CONFIRM_BILL", title: "✅ Yes, Pay" },
                 { id: "CANCEL_BILL", title: "❌ No, Cancel" },
                 { id: "HOME", title: "🏠 Home" }
@@ -941,7 +950,7 @@ export class WebhookController {
                 { id: "BACK", title: "🔙 Back", description: "Return" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ];
-            await whapiService.sendList(phoneNumber, `₿ *Asset Trading Desk*\n\nPowered by **Bitnob Pro** ⚡\n\nTrade assets and use the world's fastest payment network:`, "Trading Markets", menu);
+            await provider.sendList!(phoneNumber, `₿ *Asset Trading Desk*\n\nPowered by **Bitnob Pro** ⚡\n\nTrade assets and use the world's fastest payment network:`, "Trading Markets", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'ASSET_TRADING', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
@@ -953,7 +962,7 @@ export class WebhookController {
                 { id: "SEND_LN", title: "🚀 Send Lightning", description: "Pay a Lightning Invoice" },
                 { id: "BACK", title: "🔙 Back", description: "Return" }
             ];
-            await whapiService.sendList(phoneNumber, `⚡ *Bitnob Crypto Hub*\n\nGlobal digital finance natively in WhatsApp:`, "Crypto Services", menu);
+            await provider.sendList!(phoneNumber, `⚡ *Bitnob Crypto Hub*\n\nGlobal digital finance natively in WhatsApp:`, "Crypto Services", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'BITNOB_HUB', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'ASSET_TRADING' }) }});
             return;
         }
@@ -965,7 +974,7 @@ export class WebhookController {
                 // For now, we simulate with a custom domain per user
                 const addr = `${phoneNumber}@chatpay.io`;
                 const msg = `✨ *Your Global Payment Address* ⚡\n\n\`${addr}\`\n\nAnyone in the world can send you Bitcoin instantly using this address. It works with CashApp, Strike, and all Lightning wallets.`;
-                await whapiService.sendButtons(phoneNumber, msg, [{ id: "BITNOB_HUB", title: "🔙 Back" }]);
+                await provider.sendButtons!(phoneNumber, msg, [{ id: "BITNOB_HUB", title: "🔙 Back" }]);
             } catch (e: any) {
                 await sendAndLog(`Failed to generate address. Please ensure your Bitnob API key is set.`, 'LN_GEN_FAILED');
             }
@@ -984,7 +993,7 @@ export class WebhookController {
                 { id: "BACK", title: "🔙 Back", description: "Return" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ];
-            await whapiService.sendList(phoneNumber, `🌍 *Global Wallets & Security*\n\n${securityStatus}\n\nExpand your financial reach:`, "Global Services", menu);
+            await provider.sendList!(phoneNumber, `🌍 *Global Wallets & Security*\n\n${securityStatus}\n\nExpand your financial reach:`, "Global Services", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'GLOBAL_ACCOUNTS', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
             return;
         }
@@ -996,7 +1005,7 @@ export class WebhookController {
 
         if (rawText === 'SECURITY_INFO') {
             const info = `🛡️ *ChatPay Security Architecture*\n\n🔐 *Layer 1 — Biometric Lock*\nEnable WhatsApp's built-in Fingerprint or Face ID to prevent unauthorized access to your chat vault.\n\n🔑 *Layer 2 — Transaction PIN*\nEvery outgoing payment requires your 4-digit PIN. Auto-delete reminders protect your PIN from exposure.\n\n⏱️ *Layer 3 — Session Guard (10 min)*\nIdle for 10 minutes? Your session locks automatically. Re-enter your PIN to continue.\n\n📧 *Layer 4 — Archiving*\nLink your email to receive PDF receipts outside WhatsApp for permanent records.\n\n🔒 *Layer 5 — Encryption*\nAll data is encrypted with AES-256 on our cloud. Your BVN is tokenized and never stored in plain text.`;
-            await whapiService.sendButtons(phoneNumber, info, [
+            await provider.sendButtons!(phoneNumber, info, [
                 { id: "SETUP_BIOMETRIC", title: "🔐 Enable Biometrics" },
                 { id: "GLOBAL_ACCOUNTS", title: "🔙 Back" },
                 { id: "HOME", title: "🏠 Home" }
@@ -1007,7 +1016,7 @@ export class WebhookController {
         if (rawText === 'SETUP_BIOMETRIC') {
             const isIOS = phoneNumber.startsWith('1') || false; // heuristic, not reliable
             const guide = `🔐 *Enable Biometric Lock for ChatPay*\n\nThis activates Fingerprint or Face ID on your WhatsApp, so nobody can open your chat — even with your phone unlocked.\n\n📱 *For iPhone (Face ID / Touch ID):*\n1. Open *WhatsApp Settings*\n2. Tap *Privacy*\n3. Tap *Screen Lock*\n4. Toggle ON *Require Face ID* or *Touch ID*\n5. Set to *Immediately*\n\n🤖 *For Android (Fingerprint):*\n1. Open *WhatsApp* → Tap ⋮ (three dots)\n2. Go to *Settings* → *Privacy*\n3. Tap *Fingerprint Lock*\n4. Toggle ON *Unlock with Fingerprint*\n5. Set lock timer to *Immediately*\n\n✅ Once enabled, your ChatPay vault is protected by your face or fingerprint — even if someone grabs your unlocked phone!\n\n💡 *Bonus:* Also enable *Disappearing Messages* (24h) in this chat for maximum privacy.`;
-            await whapiService.sendButtons(phoneNumber, guide, [
+            await provider.sendButtons!(phoneNumber, guide, [
                 { id: "SECURITY_INFO", title: "🔒 Security Overview" },
                 { id: "HOME", title: "🏠 Home" }
             ]);
@@ -1038,7 +1047,7 @@ export class WebhookController {
         const diff = now.getTime() - lastUpdated.getTime();
 
         if (diff > TEN_MINUTES && session.currentState !== 'START' && session.currentState !== 'AWAITING_REAUTH_PIN') {
-            await whapiService.sendMessage(phoneNumber, `🔒 *Session Expired:* For your security, please enter your *4-digit PIN* to resume banking.\n\n⚠️ _Remember to delete your PIN message after sending._`);
+            await provider.sendMessage(phoneNumber, `🔒 *Session Expired:* For your security, please enter your *4-digit PIN* to resume banking.\n\n⚠️ _Remember to delete your PIN message after sending._`);
             await prisma.session.update({ 
                 where: { id: session.id }, 
                 data: { currentState: 'AWAITING_REAUTH_PIN', updatedAt: now } 
@@ -1059,7 +1068,7 @@ export class WebhookController {
         }
 
         if (rawText === 'SEND_MONEY_FLOW') {
-            await whapiService.sendList(phoneNumber, `Okay! 💸 Choose your transfer method:`, "Transfer Mode", [
+            await provider.sendList!(phoneNumber, `Okay! 💸 Choose your transfer method:`, "Transfer Mode", [
                 { id: "BANK_TRANSFER", title: "🏦 External Bank", description: "Send to any Nigerian bank" },
                 { id: "P2P_TRANSFER", title: "📱 Internal User", description: "Transfer to another ChatPay user" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
@@ -1156,7 +1165,7 @@ export class WebhookController {
                     { id: "BANK_035:Wema Bank", title: "Wema Bank", description: "035" },
                     { id: "BANK_050:Ecobank", title: "Ecobank", description: "050" }
                 ];
-                await whapiService.sendList(phoneNumber, `Recipient: ${accountNumber} ✅\n\nNow select the **Destination Bank** from the list below:`, "Select Bank", popularBanks);
+                await provider.sendList!(phoneNumber, `Recipient: ${accountNumber} ✅\n\nNow select the **Destination Bank** from the list below:`, "Select Bank", popularBanks);
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TRANSFER_BANK_SELECT', context: JSON.stringify({ ...context, accountNumber, previousState: 'AWAITING_TRANSFER_BANK_ACCOUNT' }) } });
             } else {
                 await sendAndLog(`Invalid account number. Please enter exactly 10 digits:`, 'TX_ACCOUNT_INVALID');
@@ -1179,7 +1188,7 @@ export class WebhookController {
                     
                     if (accountName) {
                         const msg = `✅ *Account Verified*\n\n*Recipient*: ${accountName}\n*Bank*: ${bankName}\n*Amount*: ₦${parseFloat(amount).toLocaleString()}\n\nProceed to send?`;
-                        await whapiService.sendButtons(phoneNumber, msg, [
+                        await provider.sendButtons!(phoneNumber, msg, [
                             { id: "CONFIRM_BANK_TX", title: "✅ Yes, Proceed" },
                             { id: "CANCEL_TX", title: "❌ No, Cancel" }
                         ]);
@@ -1239,7 +1248,7 @@ export class WebhookController {
             try {
                 const wallet = await WalletService.setupUserWallet(user.id, 'individual', undefined, 'USD');
                 const msg = `✨ *USD Account Ready!* 🇺🇸\n\n*Account Number*: ${wallet?.accountNumber}\n*Bank*: Fincra Global\n*Account Name*: ${user.name}\n\n_You can now receive US payments directly to your ChatPay vault._`;
-                await whapiService.sendButtons(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
+                await provider.sendButtons!(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
             } catch (e: any) {
                 const errorBody = e.response?.data?.error || e.message;
                 if (errorBody?.includes('FCY request is disabled')) {
@@ -1257,7 +1266,7 @@ export class WebhookController {
             try {
                 const wallet = await WalletService.setupUserWallet(user.id, 'individual', undefined, 'GBP');
                 const msg = `✨ *GBP Account Ready!* 🇬🇧\n\n*Account Number*: ${wallet?.accountNumber}\n*Bank*: Fincra Global\n*Account Name*: ${user.name}\n\n_Welcome to international banking._`;
-                await whapiService.sendButtons(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
+                await provider.sendButtons!(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
             } catch (e: any) {
                 const errorBody = e.response?.data?.error || e.message;
                 if (errorBody?.includes('FCY request is disabled')) {
@@ -1304,7 +1313,7 @@ export class WebhookController {
                     const { amount, recipient } = aiResult.entities || {};
                     if (amount && recipient && /^\d+$/.test(recipient)) {
                         // AI found amount and account number, jump slightly ahead
-                        await whapiService.sendButtons(phoneNumber, `I've prepared a transfer of ₦${amount} to account *${recipient}*.\n\nContinue?`, [
+                        await provider.sendButtons!(phoneNumber, `I've prepared a transfer of ₦${amount} to account *${recipient}*.\n\nContinue?`, [
                             { id: "BANK_TRANSFER", title: "✅ Yes, Continue" },
                             { id: "HOME", title: "🏠 Home" }
                         ]);
@@ -1355,7 +1364,7 @@ export class WebhookController {
                             const wallet = await WalletService.setupUserWallet(user.id, 'individual');
                             user = await prisma.user.findUnique({ where: { id: user.id } }) as any;
                             const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\nBalance: ₦0\n\n_Fund your account using the details above to get started._`;
-                            await whapiService.sendButtons(phoneNumber, bankDetails, [
+                            await provider.sendButtons!(phoneNumber, bankDetails, [
                                 { id: "HOME", title: "🏠 Home" },
                                 { id: "FUND_WALLET", title: "🏦 Fund Wallet" }
                             ]);
@@ -1384,7 +1393,7 @@ export class WebhookController {
                         await sendAndLog(`Your virtual account is still being generated by the bank... ⏳ Please try again in 60 seconds.`, 'BALANCE_PENDING');
                     } else {
                         const balMsg = `💰 *Your ChatPay Balance*:\n₦${balance.toLocaleString()}\n\n*Account*: ${user.fincraWalletId}\n*Bank*: WEMA BANK (ChatPay)`;
-                        await whapiService.sendButtons(phoneNumber, balMsg, [
+                        await provider.sendButtons!(phoneNumber, balMsg, [
                             { id: "SEND_MONEY_FLOW", title: "💸 Send Money" },
                             { id: "PAY_BILLS", title: "💡 Pay Bills" },
                             { id: "HOME", title: "🏠 Home" }
@@ -1403,7 +1412,7 @@ export class WebhookController {
                     if (!amount || !billType) {
                         await sendAndLog(`Please specify the amount and what you want to pay for (e.g. Airtime, DSTV).`, 'MISSING_ENTITIES');
                     } else {
-                        await whapiService.sendButtons(phoneNumber, `Confirm: Pay ₦${amount} for *${billType}* to ${targetCustomer}? 💡`, [
+                        await provider.sendButtons!(phoneNumber, `Confirm: Pay ₦${amount} for *${billType}* to ${targetCustomer}? 💡`, [
                             { id: "CONFIRM_BILL", title: "✅ Yes, Pay" },
                             { id: "CANCEL_BILL", title: "❌ No, Cancel" },
                             { id: "HOME", title: "🏠 Home" }
@@ -1595,7 +1604,7 @@ export class WebhookController {
                                 const msg = `💱 *Currency Exchange Rate*\n\n1 ${dest} = ₦${rate.toLocaleString()} ${source}\n\n💰 *Your Conversion:*\n${numAmount.toLocaleString()} ${source} ≈ *${receiveAmount} ${dest}*${usedFincra && quoteRef ? '\n\nProceed with this swap?' : ''}`;
                                 
                                 if (usedFincra && quoteRef) {
-                                    await whapiService.sendButtons(phoneNumber, msg, [
+                                    await provider.sendButtons!(phoneNumber, msg, [
                                         { id: `EXECUTE_SWAP:${quoteRef}`, title: "✅ Yes, Swap Now" },
                                         { id: "HOME", title: "❌ Cancel" }
                                     ]);
@@ -1695,7 +1704,7 @@ export class WebhookController {
                         await sendAndLog(`Sure! Which betting platform (e.g. SportyBet, Bet9ja) and how much would you like to fund?`, 'BETTING_PROMPT');
                     } else {
                         const targetID = customer || 'your account';
-                        await whapiService.sendButtons(phoneNumber, `Confirm: Fund ₦${parseFloat(amount).toLocaleString()} into *${platform.toUpperCase()}* for ${targetID}? 🎮`, [
+                        await provider.sendButtons!(phoneNumber, `Confirm: Fund ₦${parseFloat(amount).toLocaleString()} into *${platform.toUpperCase()}* for ${targetID}? 🎮`, [
                             { id: "CONFIRM_BET", title: "✅ Yes, Fund Now" },
                             { id: "HOME", title: "🏠 Cancel" }
                         ]);
@@ -1735,7 +1744,7 @@ export class WebhookController {
                 if (history.length === 0) {
                     const welcomeMsg = `🤖 *Meet Your ChatPay AI Agent* 🤖\n\nI am your new autonomous financial guardian. I don't just "bank"—I **execute missions** for you.\n\n✨ *What I can do right now:*\n\n🛡️ **Escrow**: I can hold funds for your IG/Jiji purchases until you get your item.\n📈 **Auto-Buy**: I can watch the market and buy Bitcoin for you while you sleep.\n📄 **Invoice Scraper**: Just forward any bill to me, and I'll pay it.\n🤝 **Social Lending**: I'll nudge your friends to pay you back so you don't have to.\n🎁 **Gift Codes**: Generate branded vouchers you can share with anyone.\n\nType *"Menu"* to see your vault, or just **talk to me** to launch a mission!`;
         
-                    await whapiService.sendImage(user.phoneNumber, 'https://chatpay-l4ej.onrender.com/assets/agent_welcome.png', welcomeMsg);
+                    await provider.sendImage!(user.phoneNumber, 'https://chatpay-l4ej.onrender.com/assets/agent_welcome.png', welcomeMsg);
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'MAIN_MENU' } });
                     return;
                 } else {
@@ -1752,7 +1761,7 @@ export class WebhookController {
                     const msg = `🔍 *Invoice Detected*\n\nI have read the document you sent:\n\n*Recipient*: ${data.BeneficiaryName || 'N/A'}\n*Bank*: ${data.BankName || 'N/A'}\n*Account*: ${data.AccountNumber || 'N/A'}\n*Amount*: ₦${parseFloat(data.Amount || '0').toLocaleString()}\n\nWhat should I do?`;
                     
                     await prisma.session.update({ where: { id: session.id }, data: { context: JSON.stringify(data) } });
-                    await whapiService.sendButtons(user.phoneNumber, msg, [
+                    await provider.sendButtons!(user.phoneNumber, msg, [
                         { id: 'CONFIRM_DOCUMENT_PAY', title: '✅ Pay Now' },
                         { id: 'HOME', title: '🏠 Cancel' }
                     ]);
@@ -1802,7 +1811,7 @@ export class WebhookController {
                     } else {
                         // Always show the current menu if we don't understand, to prevent the user from being stuck
                         await sendAndLog("I'm here to help, but I'm not sure about that request. 🤖 Let's stick to the menu options below:", 'FALLBACK_MENU');
-                        return WebhookController.processLogic(user, session, aiResult, 'REFRESH');
+                        return WebhookController.processLogic(user, session, aiResult, 'REFRESH', provider);
                     }
                 }
                 break;
