@@ -115,6 +115,12 @@ export class AiService {
         const openai = await this.getOpenAI();
         if (!openai) return { error: "Vision AI unavailable" };
 
+        const supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!supportedTypes.includes(mimeType)) {
+            console.log(`[AI Vision] Unsupported mime type: ${mimeType}`);
+            return { error: `Unsupported file type: ${mimeType}. Please send an image (JPG/PNG).` };
+        }
+
         try {
             const base64 = buffer.toString('base64');
             const response = await openai.chat.completions.create({

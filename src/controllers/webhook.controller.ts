@@ -18,7 +18,9 @@ export class WebhookController {
     
     static async handleIncoming(req: Request, res: Response) {
         // DIAGNOSTIC: Log outbound IP for Fincra whitelisting
-        axios.get('https://api.ipify.org').then(res => console.log(`[DIAGNOSTIC] Server Outbound IP: ${res.data}`)).catch(() => {});
+        axios.get('https://api.ipify.org')
+            .then(res => console.log(`[DIAGNOSTIC] Server Outbound IP: ${res.data}`))
+            .catch(() => {});
 
         const startTime = Date.now();
         try {
@@ -67,6 +69,8 @@ export class WebhookController {
                         const extracted = await aiService.scrapeDocument(buffer, mime);
                         if (extracted && extracted.AccountNumber) {
                             rawText = `SCRAPED_DOCUMENT:${JSON.stringify(extracted)}`;
+                        } else if (extracted && extracted.error) {
+                            rawText = `DOCUMENT_READ_ERROR:${extracted.error}`;
                         } else {
                             rawText = 'DOCUMENT_READ_FAILURE';
                         }
@@ -89,14 +93,12 @@ export class WebhookController {
 
                     if (msg.type === 'interactive' && msg.interactive?.type === 'flow_response') {
                         const flowData = msg.interactive.flow_response?.response_json;
-                        // Map flow data to a recognizable text trigger for the logic processor
                         if (flowData) {
                             rawText = `FLOW_RESPONSE_${JSON.stringify(flowData)}`;
                             console.log(`[Webhook] Extracted Flow Data:`, flowData);
                         }
                     } else if (interactiveId) {
                         rawText = interactiveId;
-                        // Strip Whapi gateway prefixes
                         if (rawText.includes(':')) rawText = rawText.split(':').pop() || rawText;
                         console.log(`[Webhook] Extracted Interactive ID: ${rawText}`);
                     } else {
@@ -1320,14 +1322,23 @@ export class WebhookController {
                     await sendAndLog(`Verify your account first to open global currency wallets.`, 'UNVERIFIED_ATTEMPT');
                 } else {
                     const { currency } = aiResult.entities || {};
-                    const targetCurrency = (currency || 'USD').toUpperCase();
-                    await sendAndLog(`Generating your *${targetCurrency}* Virtual Account... 🏦 ⏳`, 'ACCOUNT_START');
-                    try {
-                        const account = await WalletService.setupUserWallet(user.id, 'individual', undefined, targetCurrency);
-                        const accountMsg = `🎉 *Your ${targetCurrency} Account is Live!* 🌍\n\n*Account Number*: ${account?.accountNumber || 'Pending'}\n*Bank*: WEMA BANK (ChatPay)\n*Currency*: ${targetCurrency}\n*Account Name*: ${user.name}\n\nFund this account to start transacting globally!`;
-                        await sendAndLog(accountMsg, 'ACCOUNT_CREATED');
-                    } catch (e: any) {
-                        await sendAndLog(`Account creation failed: ${e.message}`, 'ACCOUNT_FAILED');
+                    if (!currency) {
+                        // User did not specify the currency, dynamically ask them using AI's reply or fallback text
+                        if (aiResult.replyText) {
+                            await sendAndLog(aiResult.replyText, 'ACCOUNT_PROMPT');
+                        } else {
+                            await sendAndLog(`I can definitely set up a new account for you! Which currency would you like? (e.g., NGN, USD, GBP, or EUR)`, 'ACCOUNT_PROMPT');
+                        }
+                    } else {
+                        const targetCurrency = currency.toUpperCase();
+                        await sendAndLog(`Generating your *${targetCurrency}* Virtual Account... 🏦 ⏳`, 'ACCOUNT_START');
+                        try {
+                            const account = await WalletService.setupUserWallet(user.id, 'individual', undefined, targetCurrency);
+                            const accountMsg = `🎉 *Your ${targetCurrency} Account is Live!* 🌍\n\n*Account Number*: ${account?.accountNumber || 'Pending'}\n*Bank*: WEMA BANK\n*Currency*: ${targetCurrency}\n*Account Name*: ${user.name}\n\nFund this account to start transacting!`;
+                            await sendAndLog(accountMsg, 'ACCOUNT_CREATED');
+                        } catch (e: any) {
+                            await sendAndLog(`Account creation failed: ${e.message}`, 'ACCOUNT_FAILED');
+                        }
                     }
                 }
                 break;

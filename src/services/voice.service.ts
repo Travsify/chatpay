@@ -1,26 +1,38 @@
 import OpenAI from 'openai';
-import axios from 'axios';
 import fs from 'fs';
-import path from 'path';
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+import prisma from '../utils/prisma.js';
 
 export class VoiceService {
-    /**
-     * Transcribe a voice note URL to text
-     */
-    static async transcribe(url: string): Promise<string> {
+    private static async getOpenAI(): Promise<OpenAI | null> {
         try {
-            const response = await axios.get(url, { responseType: 'arraybuffer' });
-            const tempFile = path.join(process.cwd(), 'temp_audio.ogg');
-            fs.writeFileSync(tempFile, Buffer.from(response.data));
+            const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            const key = config?.openaiKey || process.env.OPENAI_API_KEY;
+            
+            if (key && key !== 'your_openai_api_key_here' && key !== '') {
+                return new OpenAI({ apiKey: key });
+            }
+        } catch (e) {
+            console.error('[Voice] Failed to fetch key:', e);
+        }
+        return null;
+    }
+
+    /**
+     * Transcribe a local voice note file to text
+     */
+    static async transcribe(filePath: string): Promise<string> {
+        try {
+            const openai = await this.getOpenAI();
+            if (!openai) {
+                console.error('[Voice] OpenAI API Key missing for transcription');
+                return '';
+            }
 
             const transcription = await openai.audio.transcriptions.create({
-                file: fs.createReadStream(tempFile),
+                file: fs.createReadStream(filePath),
                 model: "whisper-1",
             });
 
-            fs.unlinkSync(tempFile);
             return transcription.text;
         } catch (error) {
             console.error('Transcription failed:', error);
@@ -33,9 +45,12 @@ export class VoiceService {
      */
     static async textToSpeech(text: string): Promise<Buffer> {
         try {
+            const openai = await this.getOpenAI();
+            if (!openai) throw new Error('OpenAI API Key missing for TTS');
+
             const mp3 = await openai.audio.speech.create({
                 model: "tts-1",
-                voice: "alloy", // "shimmer" or "alloy" are good for clarity
+                voice: "alloy",
                 input: text,
             });
             const buffer = Buffer.from(await mp3.arrayBuffer());
