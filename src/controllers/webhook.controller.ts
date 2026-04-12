@@ -601,7 +601,6 @@ export class WebhookController {
                                 } 
                             });
                             await sendAndLog(`Success! 🎮 I've funded your ${context.platform} account (${customer}) with ₦${parseFloat(amount).toLocaleString()}.\n\nGo win some money! 🚀\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'BETTING_SUCCESS');
-                        }Log(`Success! ✅ Your ${billType} bill is settled.\n\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'BILL_SUCCESS');
                         }
                         
                         // NEW: AUTOMATIC PDF RECEIPT FOR ALL TX
