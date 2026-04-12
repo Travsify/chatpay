@@ -1564,12 +1564,12 @@ export class WebhookController {
                                 // Check if admin has set a manual rate
                                 if (dest === 'USD' && config?.usdExchangeRate && config.usdExchangeRate > 0) {
                                     rate = config.usdExchangeRate + (config.usdMarkup || 0);
-                                } else if (dest === 'EUR' && config?.eurMarkup) {
+                                } else if (dest === 'EUR' && (config as any)?.eurMarkup) {
                                     // Use free API for EUR
                                     const rateRes = await axios.get(`https://open.er-api.com/v6/latest/${source}`);
                                     const apiRate = rateRes.data?.rates?.[dest];
                                     if (apiRate) rate = 1 / apiRate;
-                                } else if (dest === 'GBP' && config?.gbpMarkup) {
+                                } else if (dest === 'GBP' && (config as any)?.gbpMarkup) {
                                     const rateRes = await axios.get(`https://open.er-api.com/v6/latest/${source}`);
                                     const apiRate = rateRes.data?.rates?.[dest];
                                     if (apiRate) rate = 1 / apiRate;
