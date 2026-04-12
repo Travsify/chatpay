@@ -124,6 +124,7 @@ model SystemConfig {
   quidaxSecret      String?
   prestmitSecret    String?
   mapleradSecret    String?
+  bitnobApiKey        String?
   
   // Financial Rules & Granular Markups
   feePercentage     Float    @default(0.5)
@@ -133,9 +134,6 @@ model SystemConfig {
   // Fiat Markups
   usdExchangeRate   Float    @default(1500.0)
   usdMarkup          Float    @default(50.0)
-  fincraWebhookSecret String?
-  bitnobApiKey        String?
-  whapiToken         String   @default("YOUR_WHAPI_TOKEN")
   gbpMarkup         Float    @default(80.0)
   
   // Asset Markups
@@ -145,6 +143,31 @@ model SystemConfig {
   cardFundingMarkup Float    @default(20.0)   // ₦20 per dollar markup for funding cards
   
   updatedAt         DateTime @updatedAt
+}
+
+// ===== SCHEDULED TASKS (Automation) =====
+model ScheduledTask {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  taskType  String   // e.g., "BUY_THE_DIP"
+  params    String?  // JSON string of task parameters
+  status    String   @default("PENDING")
+  executeAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// ===== VOUCHERS (Minted Assets) =====
+model Voucher {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  code        String   @unique
+  amount      Float
+  currency    String   @default("NGN")
+  isRedeemed  Boolean  @default(false)
+  redeemedAt  DateTime?
+  createdAt   DateTime @default(now())
 }
 
 // ===== BUSINESS KYB (PREMBLY) =====
@@ -205,3 +228,4 @@ enum WebhookStatus {
   PROCESSED
   FAILED
 }
+
