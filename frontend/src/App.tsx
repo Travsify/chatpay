@@ -450,10 +450,10 @@ const Home = () => {
                   }
                 }}
               >
-                Get the App
+                Install App
               </button>
               <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-[#25D366]/30 transition-all hover:-translate-y-0.5">
-                Launch App
+                Chat on WhatsApp
               </a>
             </div>
           </div>
@@ -487,10 +487,10 @@ const Home = () => {
              
              <div className="flex flex-col sm:flex-row items-stretch justify-center gap-4 px-4 sm:px-0">
                <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="px-6 py-4 md:px-8 md:py-4 bg-[#25D366] text-[#0b141a] rounded-2xl font-black text-base md:text-lg hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(37,211,102,0.3)]">
-                 <Send size={20} /> Launch on WhatsApp
+                 <Send size={20} /> Chat on WhatsApp
                </a>
                <Link to="/vault" className="px-6 py-4 md:px-8 md:py-4 bg-surface border border-border text-white rounded-2xl font-bold text-base md:text-lg hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
-                 <Smartphone size={20} /> Enter Web Vault
+                 <Smartphone size={20} /> Chat on Web
                </Link>
              </div>
 
@@ -741,7 +741,7 @@ const Home = () => {
             <h2 className="text-4xl sm:text-5xl md:text-6xl font-black mb-6 relative z-10 tracking-tight text-white">Stop downloading apps.</h2>
             <p className="text-base md:text-lg text-[#8696a0] mb-10 relative z-10 max-w-xl mx-auto">Join the revolution. Turn your WhatsApp into a high-powered financial terminal today.</p>
             <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] hover:text-white hover:scale-105 inline-flex py-4 px-8 md:py-5 md:px-10 rounded-2xl font-black text-base md:text-lg relative z-10 transition-all shadow-[0_0_20px_rgba(37,211,102,0.4)]">
-              Start Chatting Now
+              Chat on WhatsApp
             </a>
           </div>
         </section>
