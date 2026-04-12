@@ -141,7 +141,8 @@ export class WebhookController {
                     kycStatus: user.kycStatus,
                     balance: contextBalance,
                     accountNumber: contextAccNum,
-                    bankName: contextBankName
+                    bankName: contextBankName,
+                    currentState: session.currentState
                 });
 
                 await prisma.conversationLog.create({
@@ -344,6 +345,24 @@ export class WebhookController {
             return;
         }
 
+        // ===== MEDIA ERROR HANDLING =====
+        if (rawText === 'VOICE_TRANSCRIPTION_FAILED') {
+            await sendAndLog(`I couldn't understand that voice message. 🎙️ Could you try again, or type your request instead?`, 'VOICE_FAILED');
+            return;
+        }
+
+        if (rawText === 'DOCUMENT_READ_FAILURE' || rawText === 'MEDIA_PROCESSING_ERROR' || rawText.startsWith('DOCUMENT_READ_ERROR:')) {
+            const errorDetail = rawText.startsWith('DOCUMENT_READ_ERROR:') ? rawText.split(':')[1] : '';
+            await sendAndLog(`Sorry, I had trouble reading that file. 📄 ${errorDetail ? errorDetail + ' ' : ''}Please try sending a clearer image (JPG/PNG) or type your request instead.`, 'MEDIA_ERROR');
+            return;
+        }
+
+        // ===== ORPHAN STATE RECOVERY =====
+        if (session.currentState === 'MAIN_MENU' || session.currentState === 'IDLE') {
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
+            session.currentState = 'START';
+        }
+
         const isMenu = rawText.toLowerCase() === 'menu' || rawText.toLowerCase() === 'features' || rawText.toLowerCase() === 'help' || rawText === 'HOME' || rawText.toLowerCase() === 'home';
         const isHi = rawText.toLowerCase().includes('hi') || rawText.toLowerCase().includes('hello');
 
@@ -438,12 +457,34 @@ export class WebhookController {
         }
 
         if (session.currentState === 'AWAITING_KYC') {
+            // Business flow: first collect CAC number, then ask for BVN+PIN
+            if (context.type === 'business' && !context.cacNumber) {
+                const cacNumber = rawText.trim().replace(/[^a-zA-Z0-9\-]/g, '');
+                if (cacNumber.length >= 5) {
+                    try {
+                        await prisma.businessKyb.upsert({
+                            where: { userId: user.id },
+                            update: { cacNumber },
+                            create: { userId: user.id, cacNumber }
+                        });
+                    } catch (e) {
+                        console.error('[KYC] BusinessKyb save error:', e);
+                    }
+                    await sendAndLog(`CAC Number *${cacNumber}* received ✅\n\nNow, to complete verification, please provide the *Business Owner's 11-digit BVN* and a *4-digit transaction PIN*.\n\nFormat: *12345678901 1234* (BVN space PIN)`, 'SIGNUP_BUSINESS_BVN');
+                    await prisma.session.update({ where: { id: session.id }, data: { context: JSON.stringify({ ...context, cacNumber }) } });
+                } else {
+                    await sendAndLog(`Invalid CAC/RC Number. ❌ Please enter a valid CAC Registration Number (e.g., RC123456):`, 'CAC_INVALID');
+                }
+                return;
+            }
+
+            // Individual flow (or business after CAC): BVN + PIN
             const parts = rawText.trim().split(/\s+/);
             const cleanBvn = parts[0]?.replace(/\D/g, '');
             const cleanPin = parts[1]?.replace(/\D/g, '');
 
             if (cleanBvn && cleanBvn.length === 11 && cleanPin && cleanPin.length >= 4) {
-                await sendAndLog(`Verifying your 11-digit BVN vault details... ⏳`, 'KYC_FLOW');
+                await sendAndLog(`Verifying your BVN vault details... ⏳`, 'KYC_FLOW');
                 
                 await prisma.user.update({ 
                     where: { id: user.id }, 
@@ -455,17 +496,30 @@ export class WebhookController {
                 });
                 
                 await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please **long-press and delete** your previous message to protect your personal identity.`, 'KYC_SECURITY_NOTICE');
-                await sendAndLog(`Verified! ✅ Finalizing your individual wallet setup with Fincra... 🏦`, 'KYC_VERIFIED');
+                
+                const walletType = context.type === 'business' ? 'business' : 'individual';
+                const businessName = context.businessName || undefined;
+                await sendAndLog(`Verified! ✅ Finalizing your ${walletType} wallet setup with Fincra... 🏦`, 'KYC_VERIFIED');
                 try {
-                    const wallet = await WalletService.setupUserWallet(user.id, 'individual');
-                    const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
+                    const wallet = await WalletService.setupUserWallet(user.id, walletType, businessName);
+                    const bankDetails = `✨ *Success! Your Wallet is Ready* 🏦\n\n*Account Number*: ${wallet?.accountNumber || 'Generating...'}\n*Bank Name*: WEMA BANK (ChatPay)\n*Account Name*: ${user.name}${businessName ? ' (' + businessName + ')' : ''}\n\n*Next Steps:*\n1. Fund your account using the details above.\n2. Type *"Balance"* to see your current funds.\n3. Type *"Menu"* to see everything I can do.`;
                     await sendAndLog(bankDetails, 'WALLET_CREATED');
+                    
+                    // Mark business KYB as verified if applicable
+                    if (context.type === 'business' && context.cacNumber) {
+                        await prisma.businessKyb.update({ 
+                            where: { userId: user.id }, 
+                            data: { status: 'VERIFIED', verifiedAt: new Date() } 
+                        }).catch(() => {});
+                    }
                 } catch (e: any) {
                     await sendAndLog(`Verification complete! ✅ We're finalizing your virtual account now. Type "Balance" in a moment to see your details.`, 'WALLET_PENDING');
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+            } else if (cleanBvn && cleanBvn.length === 11 && !cleanPin) {
+                await sendAndLog(`Almost there! 🔑 Please also include a *4-digit PIN* after your BVN.\n\nFormat: *12345678901 1234* (BVN followed by PIN)`, 'KYC_MISSING_PIN');
             } else {
-                await sendAndLog(`Invalid BVN. ❌ Your BVN must be exactly 11 digits. Please enter it again correctly to secure your wallet:`, 'KYC_INVALID');
+                await sendAndLog(`Invalid format. ❌ Please enter your *11-digit BVN* followed by a *4-digit PIN*.\n\nExample: *12345678901 1234*`, 'KYC_INVALID');
             }
             return;
         }
@@ -475,10 +529,10 @@ export class WebhookController {
             
             if (rawText.toLowerCase().includes('yes') || rawText === 'CONFIRM_TX') {
                 if (!user.transactionPin) {
-                    await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to secure your account and authorize payments:`, 'PIN_SETUP_START');
+                    await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to secure your account and authorize payments.\n\n⚠️ _You will be prompted to delete the message after._`, 'PIN_SETUP_START');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
                 } else {
-                    await sendAndLog(`Please enter your *4-digit PIN* to authorize this transaction:`, 'PIN_VERIFY_REQUEST');
+                    await sendAndLog(`🔐 Enter your *4-digit PIN* to authorize this transaction.\n\n⚠️ _Remember to delete your PIN message after sending._`, 'PIN_VERIFY_REQUEST');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
                 }
             } else if (rawText === 'BACK' || rawText === 'CANCEL_TX' || rawText.toLowerCase().includes('no')) {
@@ -498,7 +552,7 @@ export class WebhookController {
             const pin = rawText.trim();
             if (pin.length === 4 && /^\d+$/.test(pin)) {
                 await prisma.user.update({ where: { id: user.id }, data: { transactionPin: pin } });
-                await sendAndLog(`PIN set successfully! ✅ Now, please enter it once more to authorize your pending transaction:\n\n⚠️ *Security Notice*: Please long-press and delete your previous message containing your new PIN to protect your account.`, 'PIN_SET_SUCCESS');
+                await sendAndLog(`PIN set successfully! ✅\n\n🗑️ *DELETE YOUR PIN MESSAGE NOW* — Long-press your previous message and tap *Delete for Everyone*.\n\nNow, please enter your PIN once more to authorize your pending transaction:`, 'PIN_SET_SUCCESS');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
             } else {
                 await sendAndLog(`Invalid PIN. ❌ Enter exactly 4 numbers (e.g., 1234):`, 'PIN_SET_INVALID');
@@ -508,6 +562,9 @@ export class WebhookController {
 
         if (session.currentState === 'AWAITING_PIN_VERIFY') {
             if (rawText.trim() === user.transactionPin) {
+                // SECURITY: Immediate PIN deletion reminder
+                await sendAndLog(`🗑️ *Security Alert:* Please **delete your PIN message now** — Long-press → Delete for Everyone.`, 'PIN_DELETE_REMINDER');
+
                 const { amount, recipient, billType, customer } = context as any;
                 
                 const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
@@ -633,8 +690,13 @@ export class WebhookController {
                     }
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+
+                // SECURITY: First-time biometric lock nudge (only after first successful transaction)
+                if (!context.biometricNudgeSent) {
+                    await sendAndLog(`💡 *Pro Tip:* For extra security, enable *Fingerprint/Face Lock* on your WhatsApp.\n\n📲 Go to *WhatsApp Settings* → *Privacy* → *Screen Lock* → Enable Fingerprint or Face ID.\n\nThis adds biometric protection so no one can access your ChatPay vault even if they have your phone.`, 'BIOMETRIC_NUDGE');
+                }
             } else {
-                await sendAndLog(`Incorrect PIN. ❌ Verification failed. Please try again:`, 'PIN_INCORRECT');
+                await sendAndLog(`Incorrect PIN. ❌ Verification failed.\n\n🗑️ *Delete your PIN message now* for safety, then try again:`, 'PIN_INCORRECT');
             }
             return;
         }
@@ -644,10 +706,10 @@ export class WebhookController {
             
             if (rawText.toLowerCase().includes('yes') || rawText === 'CONFIRM_BILL') {
                 if (!user.transactionPin) {
-                    await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to authorize your payment:`, 'PIN_SETUP_START');
+                    await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to authorize your payment.\n\n⚠️ _You will be prompted to delete the message after._`, 'PIN_SETUP_START');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
                 } else {
-                    await sendAndLog(`Please enter your *4-digit PIN* to authorize this bill payment:`, 'PIN_VERIFY_REQUEST');
+                    await sendAndLog(`🔐 Enter your *4-digit PIN* to authorize this bill payment.\n\n⚠️ _Remember to delete your PIN message after sending._`, 'PIN_VERIFY_REQUEST');
                     await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
                 }
             } else if (rawText === 'CANCEL_BILL' || rawText.toLowerCase().includes('no')) {
@@ -659,6 +721,25 @@ export class WebhookController {
                     { id: "CANCEL_BILL", title: "❌ No, Cancel" },
                     { id: "HOME", title: "🏠 Home" }
                 ]);
+            }
+            return;
+        }
+
+        // ===== BETTING CONFIRMATION HANDLER =====
+        if (session.currentState === 'AWAITING_BET_CONFIRM') {
+            const { amount, platform, customer } = context as any;
+            
+            if (rawText.toLowerCase().includes('yes') || rawText === 'CONFIRM_BET') {
+                if (!user.transactionPin) {
+                    await sendAndLog(`🔐 *Security Setup Required*\n\nPlease enter a *4-digit PIN* to authorize this funding.\n\n⚠️ _You will be prompted to delete the message after._`, 'PIN_SETUP_START');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
+                } else {
+                    await sendAndLog(`🔐 Enter your *4-digit PIN* to authorize funding ₦${parseFloat(amount).toLocaleString()} to ${platform}.\n\n⚠️ _Remember to delete your PIN message after sending._`, 'PIN_VERIFY_REQUEST');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
+                }
+            } else if (rawText === 'HOME' || rawText.toLowerCase().includes('no') || rawText.toLowerCase().includes('cancel')) {
+                await sendAndLog(`Betting funding cancelled. ❌`, 'BET_CANCELLED');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
             }
             return;
         }
@@ -809,6 +890,37 @@ export class WebhookController {
             return;
         }
 
+        // ===== BILL INPUT HANDLER =====
+        if (session.currentState === 'AWAITING_BILL_INPUT') {
+            if (rawText === 'BACK' || rawText === 'HOME') {
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+                return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, rawText === 'HOME' ? 'Menu' : 'PAY_BILLS');
+            }
+            const billParts = rawText.trim().split(/\s+/);
+            const customerIdentifier = billParts[0];
+            const billAmount = parseFloat((billParts[1] || '').replace(/[^0-9.]/g, ''));
+
+            if (!customerIdentifier || isNaN(billAmount) || billAmount <= 0) {
+                await sendAndLog(`Invalid input. ❌ Please enter the phone/meter number and amount.\n\nExample: *08012345678 1000*`, 'BILL_INPUT_INVALID');
+                return;
+            }
+
+            const billType = context.billProvider || 'Airtime';
+            await whapiService.sendButtons(phoneNumber, `Confirm: Pay ₦${billAmount.toLocaleString()} for *${billType}* to ${customerIdentifier}? 💡`, [
+                { id: "CONFIRM_BILL", title: "✅ Yes, Pay" },
+                { id: "CANCEL_BILL", title: "❌ No, Cancel" },
+                { id: "HOME", title: "🏠 Home" }
+            ]);
+            await prisma.session.update({ 
+                where: { id: session.id }, 
+                data: { 
+                    currentState: 'AWAITING_BILL_CONFIRM', 
+                    context: JSON.stringify({ ...context, amount: billAmount, billType, customer: customerIdentifier }) 
+                } 
+            });
+            return;
+        }
+
         if (rawText === 'ASSET_TRADING' || rawText === 'REFRESH' && session.currentState === 'ASSET_TRADING') {
             const menu = [
                 { id: "BITNOB_HUB", title: "⚡ Bitnob Crypto Hub", description: "Lightning & Stablecoins" },
@@ -854,6 +966,7 @@ export class WebhookController {
                 { id: "OPEN_ACCOUNT_USD", title: "🇺🇸 Open USD Account", description: "Get US Banking details" },
                 { id: "OPEN_ACCOUNT_GBP", title: "🇬🇧 Open GBP Account", description: "Get UK Banking details" },
                 { id: "SET_EMAIL", title: user.email ? "📧 Update Archive Email" : "📧 Link Archive Email", description: "Save receipts to email" },
+                { id: "SETUP_BIOMETRIC", title: "🔐 Biometric Lock", description: "Enable fingerprint/face lock" },
                 { id: "SECURITY_INFO", title: "🔒 Security Overview", description: "Vault protection details" },
                 { id: "BACK", title: "🔙 Back", description: "Return" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
@@ -869,9 +982,20 @@ export class WebhookController {
         }
 
         if (rawText === 'SECURITY_INFO') {
-            const info = `🛡️ *ChatPay Security Architecture*\n\n1. *10-Min Session Guard*: If inactive for 10 mins, you must re-enter your PIN to unlock banking.\n2. *External Archiving*: Link your email to receive PDF receipts & invoices outside of WhatsApp.\n3. *Device Privacy*: We recommend enabling "Ephemeral Messages" in your Chat Settings for extra security.\n4. *Encryption*: All bank-grade data is encrypted on our secure AWS cloud.`;
+            const info = `🛡️ *ChatPay Security Architecture*\n\n🔐 *Layer 1 — Biometric Lock*\nEnable WhatsApp's built-in Fingerprint or Face ID to prevent unauthorized access to your chat vault.\n\n🔑 *Layer 2 — Transaction PIN*\nEvery outgoing payment requires your 4-digit PIN. Auto-delete reminders protect your PIN from exposure.\n\n⏱️ *Layer 3 — Session Guard (10 min)*\nIdle for 10 minutes? Your session locks automatically. Re-enter your PIN to continue.\n\n📧 *Layer 4 — Archiving*\nLink your email to receive PDF receipts outside WhatsApp for permanent records.\n\n🔒 *Layer 5 — Encryption*\nAll data is encrypted with AES-256 on our cloud. Your BVN is tokenized and never stored in plain text.`;
             await whapiService.sendButtons(phoneNumber, info, [
+                { id: "SETUP_BIOMETRIC", title: "🔐 Enable Biometrics" },
                 { id: "GLOBAL_ACCOUNTS", title: "🔙 Back" },
+                { id: "HOME", title: "🏠 Home" }
+            ]);
+            return;
+        }
+
+        if (rawText === 'SETUP_BIOMETRIC') {
+            const isIOS = phoneNumber.startsWith('1') || false; // heuristic, not reliable
+            const guide = `🔐 *Enable Biometric Lock for ChatPay*\n\nThis activates Fingerprint or Face ID on your WhatsApp, so nobody can open your chat — even with your phone unlocked.\n\n📱 *For iPhone (Face ID / Touch ID):*\n1. Open *WhatsApp Settings*\n2. Tap *Privacy*\n3. Tap *Screen Lock*\n4. Toggle ON *Require Face ID* or *Touch ID*\n5. Set to *Immediately*\n\n🤖 *For Android (Fingerprint):*\n1. Open *WhatsApp* → Tap ⋮ (three dots)\n2. Go to *Settings* → *Privacy*\n3. Tap *Fingerprint Lock*\n4. Toggle ON *Unlock with Fingerprint*\n5. Set lock timer to *Immediately*\n\n✅ Once enabled, your ChatPay vault is protected by your face or fingerprint — even if someone grabs your unlocked phone!\n\n💡 *Bonus:* Also enable *Disappearing Messages* (24h) in this chat for maximum privacy.`;
+            await whapiService.sendButtons(phoneNumber, guide, [
+                { id: "SECURITY_INFO", title: "🔒 Security Overview" },
                 { id: "HOME", title: "🏠 Home" }
             ]);
             return;
@@ -901,7 +1025,7 @@ export class WebhookController {
         const diff = now.getTime() - lastUpdated.getTime();
 
         if (diff > TEN_MINUTES && session.currentState !== 'START' && session.currentState !== 'AWAITING_REAUTH_PIN') {
-            await whapiService.sendMessage(phoneNumber, `🔒 *Session Expired:* For your security, please enter your *4-digit PIN* to resume banking:`);
+            await whapiService.sendMessage(phoneNumber, `🔒 *Session Expired:* For your security, please enter your *4-digit PIN* to resume banking.\n\n⚠️ _Remember to delete your PIN message after sending._`);
             await prisma.session.update({ 
                 where: { id: session.id }, 
                 data: { currentState: 'AWAITING_REAUTH_PIN', updatedAt: now } 
@@ -911,12 +1035,12 @@ export class WebhookController {
 
         if (session.currentState === 'AWAITING_REAUTH_PIN') {
             if (rawText === user.transactionPin) {
-                await sendAndLog(`✅ *Re-authenticated!* How can I help you today?`, 'REAUTH_SUCCESS');
+                await sendAndLog(`✅ *Re-authenticated!*\n\n🗑️ *Delete your PIN message now* — Long-press → Delete for Everyone.\n\nHow can I help you today?`, 'REAUTH_SUCCESS');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', updatedAt: now } });
                 // Re-trigger the menu
                 return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'Menu');
             } else {
-                await sendAndLog(`❌ Incorrect PIN. Please try again or type 'Reset' if you forgot it:`, 'REAUTH_FAILED');
+                await sendAndLog(`❌ Incorrect PIN.\n\n🗑️ *Delete your PIN message now* for safety, then try again or type *'Reset'* if you forgot it:`, 'REAUTH_FAILED');
                 return;
             }
         }
@@ -978,14 +1102,14 @@ export class WebhookController {
 
         if (session.currentState === 'AWAITING_INTL_BENEFICIARY') {
             const beneficiary = rawText.trim();
-            await sendAndLog(`Please securely enter your **4-digit PIN** to authorize sending ${context.destAmount} ${context.targetCur} to ${beneficiary}:`, 'INTL_PIN_REQ');
+            await sendAndLog(`🔐 Enter your **4-digit PIN** to authorize sending ${context.destAmount} ${context.targetCur} to ${beneficiary}.\n\n⚠️ _Remember to delete your PIN message after sending._`, 'INTL_PIN_REQ');
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_INTL_PIN', context: JSON.stringify({ ...context, beneficiary }) } });
             return;
         }
 
         if (session.currentState === 'AWAITING_INTL_PIN') {
-            if (rawText !== user.pin) {
-                await sendAndLog(`❌ Incorrect PIN. Please try again:`, 'PIN_INVALID');
+            if (rawText !== user.transactionPin) {
+                await sendAndLog(`❌ Incorrect PIN.\n\n🗑️ *Delete your PIN message now* for safety, then try again:`, 'PIN_INVALID');
                 return;
             }
             await sendAndLog(`Processing your international transfer... 🌍⏳`, 'INTL_PROCESSING');
@@ -1065,13 +1189,33 @@ export class WebhookController {
             return;
         }
 
+        if (rawText === 'CONFIRM_DOCUMENT_PAY') {
+            const { BeneficiaryName, BankName, AccountNumber, Amount } = context as any;
+            const docAmount = parseFloat(Amount || '0');
+            if (docAmount <= 0 || !AccountNumber) {
+                await sendAndLog(`❌ Invalid payment details detected in the document. Please try again with a clearer image.`, 'DOC_PAY_INVALID');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
+                return;
+            }
+            // Transition into the transfer confirmation flow with scraped document data
+            await prisma.session.update({ 
+                where: { id: session.id }, 
+                data: { 
+                    currentState: 'AWAITING_TRANSFER_CONFIRM',
+                    context: JSON.stringify({ ...context, amount: docAmount, recipient: BeneficiaryName || 'N/A', bankName: BankName, accountNumber: AccountNumber, type: 'bank' })
+                }
+            });
+            const updatedSession = await prisma.session.findUnique({where:{id:session.id}});
+            return WebhookController.processLogic(user, updatedSession, { intent: 'UNKNOWN' }, 'CONFIRM_TX');
+        }
+
         if (rawText === 'CONFIRM_BANK_TX') {
             const { recipient, amount, bankName } = context as any;
             if (!user.transactionPin) {
-                await sendAndLog(`🔐 *Security Setup Required*\n\nPlease set a *4-digit PIN* to authorize this transfer:`, 'PIN_SETUP_START');
+                await sendAndLog(`🔐 *Security Setup Required*\n\nPlease set a *4-digit PIN* to authorize this transfer.\n\n⚠️ _You will be prompted to delete the message after._`, 'PIN_SETUP_START');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
             } else {
-                await sendAndLog(`Please enter your *4-digit PIN* to authorize sending ₦${parseFloat(amount).toLocaleString()} to ${recipient} (${bankName}):`, 'PIN_VERIFY_REQUEST');
+                await sendAndLog(`🔐 Enter your *4-digit PIN* to authorize sending ₦${parseFloat(amount).toLocaleString()} to ${recipient} (${bankName}).\n\n⚠️ _Remember to delete your PIN message after sending._`, 'PIN_VERIFY_REQUEST');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
             }
             return;
@@ -1210,6 +1354,9 @@ export class WebhookController {
                             if (errorMsg?.toLowerCase().includes('match the provided name')) {
                                 const failMsg = `⚠️ *Name Mismatch Error*\n\nYour BVN verification failed because the name you provided (*${user.name}*) does not match the legal name on your BVN record.\n\nPlease type *'Reset'* to restart and use your **Exact Legal Names** as they appear on your ID card.`;
                                 await sendAndLog(failMsg, 'KYC_NAME_MISMATCH');
+                            } else if (errorMsg?.includes('already exists') || errorMsg?.includes('DUPLICATE_REFERENCE')) {
+                                const existMsg = `Sorry, you have an account already with us and for that reason we won't be able to create an account for you. However, I have synced your existing details! 🏦\n\nPlease try checking your balance again.`;
+                                await sendAndLog(existMsg, 'WALLET_ALREADY_EXISTS');
                             } else {
                                 await sendAndLog(`We're having trouble connecting to the bank. Please try again in a moment.`, 'WALLET_RETRY_FAILED');
                             }
@@ -1344,7 +1491,9 @@ export class WebhookController {
                 break;
             case 'OPEN_ACCOUNT':
                 if (user.kycStatus !== 'VERIFIED') {
-                    await sendAndLog(`Verify your account first to open global currency wallets.`, 'UNVERIFIED_ATTEMPT');
+                    // Redirect unverified users to signup instead of dead-ending
+                    await sendAndLog(`Let's get you set up first! 🏦 I'll guide you through account activation.`, 'ACCOUNT_ONBOARD_REDIRECT');
+                    return WebhookController.processLogic(user, session, aiResult, 'START_ONBOARDING');
                 } else {
                     const { currency } = aiResult.entities || {};
                     if (!currency) {
@@ -1362,7 +1511,12 @@ export class WebhookController {
                             const accountMsg = `🎉 *Your ${targetCurrency} Account is Live!* 🌍\n\n*Account Number*: ${account?.accountNumber || 'Pending'}\n*Bank*: WEMA BANK\n*Currency*: ${targetCurrency}\n*Account Name*: ${user.name}\n\nFund this account to start transacting!`;
                             await sendAndLog(accountMsg, 'ACCOUNT_CREATED');
                         } catch (e: any) {
-                            await sendAndLog(`Account creation failed: ${e.message}`, 'ACCOUNT_FAILED');
+                            const errorMsg = e.response?.data?.error || e.message;
+                            if (errorMsg?.includes('already exists') || errorMsg?.includes('DUPLICATE_REFERENCE')) {
+                                await sendAndLog(`Sorry, you have an account already with us and for that reason we won't be able to create multiple ${targetCurrency} accounts for you. 🏦`, 'ACCOUNT_EXISTS');
+                            } else {
+                                await sendAndLog(`Account creation failed: ${errorMsg}`, 'ACCOUNT_FAILED');
+                            }
                         }
                     }
                 }

@@ -77,7 +77,49 @@ export class WalletService {
                 virtualAccountId
             };
         } catch (error: any) {
-            console.error('[Wallet] Failed to setup user wallet:', error.response?.status, error.response?.data || error.message);
+            const status = error.response?.status;
+            const data = error.response?.data;
+            
+            // 409: DUPLICATE_REFERENCE recovery logic
+            if (status === 409 && (data?.errorType === 'DUPLICATE_REFERENCE' || data?.error?.includes('already exists'))) {
+                console.log(`[Wallet] Account reference already exists. Attempting recovery for user ${userId}...`);
+                try {
+                    const reference = `chatpay-${user.id.slice(0, 8)}-${currency.toLowerCase()}`;
+                    const accounts = await fincraService.listVirtualAccounts(currency.toLowerCase());
+                    
+                    // Fincra returns { success: true, data: [...] }
+                    const existing = accounts.data?.find((a: any) => a.merchantReference === reference);
+                    
+                    if (existing) {
+                        console.log(`[Wallet] Recovery successful! Found existing account: ${existing.accountNumber}`);
+                        const accountNumber = existing.accountInformation?.accountNumber || existing.accountNumber;
+                        const virtualAccountId = existing._id;
+                        const bankName = existing.accountInformation?.bankName || 'WEMA BANK';
+
+                        await prisma.user.update({
+                            where: { id: userId },
+                            data: {
+                                fincraCustomerId: virtualAccountId,
+                                fincraWalletId: accountNumber
+                            }
+                        });
+
+                        return {
+                            accountNumber,
+                            bankName,
+                            accountName: existing.accountInformation?.accountName || user.name,
+                            virtualAccountId
+                        };
+                    }
+                } catch (recoveryErr) {
+                    console.error('[Wallet] Recovery failed:', recoveryErr);
+                }
+                
+                // If recovery fails or no match found, throw specific error for the controller to handle
+                throw new Error('ACCOUNT_EXISTS_REDIRECT');
+            }
+
+            console.error('[Wallet] Failed to setup user wallet:', status, data || error.message);
             throw error;
         }
     }

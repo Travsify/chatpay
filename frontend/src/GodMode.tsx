@@ -204,7 +204,7 @@ const StatCard = ({ label, value, trend, icon: Icon, color, sub }: any) => (
       )}
     </div>
     <p className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-1">{label}</p>
-    <h3 className="text-2xl font-black text-white tracking-tight">{value}</h3>
+    <h3 className="text-2xl font-black text-white tracking-tight">{value || '0'}</h3>
     {sub && <p className="text-[10px] text-[#8696a0] mt-1">{sub}</p>}
   </div>
 );
@@ -302,8 +302,10 @@ const OverviewTab = ({ api }: { api: any }) => {
   const [metrics, setMetrics] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
+    setLoading(true);
     Promise.all([
       api('/api/admin/metrics').then((r: any) => r.data),
       api('/api/admin/analytics?days=14').then((r: any) => r.data).catch(() => null)
@@ -311,11 +313,18 @@ const OverviewTab = ({ api }: { api: any }) => {
       setMetrics(m);
       setAnalytics(a);
       setLoading(false);
-    }).catch(() => setLoading(false));
-  }, []);
+    }).catch((err) => {
+        console.error('Metrics fetch error:', err);
+        setLoading(false);
+    });
+  }, [api]);
 
-  if (loading) return <LoadingSpinner label="Loading metrics..." />;
-  if (!metrics) return <ErrorState message="Failed to load metrics" />;
+  useEffect(() => {
+    fetchData();
+  }, [fetchData, refreshKey]);
+
+  if (loading && !metrics) return <LoadingSpinner label="Loading network metrics..." />;
+  if (!metrics) return <ErrorState message="Failed to load metrics. The backend might be down or initializing." retry={() => setRefreshKey(k => k + 1)} />;
 
   return (
     <div className="space-y-6">
@@ -326,6 +335,13 @@ const OverviewTab = ({ api }: { api: any }) => {
           <p className="text-[#8696a0] text-sm">Real-time network intelligence</p>
         </div>
         <div className="flex gap-3 items-center">
+          <button 
+            onClick={() => setRefreshKey(k => k + 1)}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-[#111b21] border border-[#222d34] text-[#8696a0] hover:text-[#25D366] hover:border-[#25D366]/30 transition-all disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
           <div className="bg-[#111b21] border border-[#25D366]/30 px-3 py-1.5 rounded-full flex items-center gap-2">
             <div className="w-2 h-2 bg-[#25D366] rounded-full animate-pulse" />
             <span className="text-[10px] font-bold uppercase tracking-wider text-[#25D366]">Live</span>
@@ -956,10 +972,23 @@ const LoadingSpinner = ({ label }: { label: string }) => (
   </div>
 );
 
-const ErrorState = ({ message }: { message: string }) => (
-  <div className="flex flex-col items-center justify-center py-16 gap-4">
-    <AlertTriangle size={40} className="text-red-400 opacity-50" />
-    <p className="text-red-400 text-sm font-bold">{message}</p>
+const ErrorState = ({ message, retry }: { message: string, retry?: () => void }) => (
+  <div className="flex flex-col items-center justify-center py-20 gap-5 text-center px-4">
+    <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center border border-red-500/20">
+      <AlertTriangle size={32} className="text-red-400" />
+    </div>
+    <div>
+       <p className="text-white font-bold mb-1">Data Feed Interrupted</p>
+       <p className="text-[#8696a0] text-xs max-w-xs">{message}</p>
+    </div>
+    {retry && (
+      <button 
+        onClick={retry}
+        className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2"
+      >
+        <RefreshCw size={14} /> Retry Connection
+      </button>
+    )}
   </div>
 );
 

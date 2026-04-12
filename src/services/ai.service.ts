@@ -58,8 +58,12 @@ export class AiService {
                 KYC: ${context?.kycStatus || 'PENDING'}
                 Current Balance: ₦${context?.balance || 0}
                 NGN Account Details: ${context?.accountNumber ? context.bankName + ' / ' + context.accountNumber : 'None Setup'}
+                Current Flow State: ${context?.currentState || 'START'}
                 
-                === CRITICAL BEHAVIOR ===
+                === MISSION TRACKING ===
+                If 'Current Flow State' is NOT 'START', the user is likely responding to your previous question. 
+                If the state is 'AWAITING_ACCOUNT_TYPE', and they say 'Individual', your intent is 'SIGNUP'.
+                If you just asked 'Ready to proceed?' and they say 'Yes', continue the current mission (e.g., OPEN_ACCOUNT).
                 1. DYNAMIC RESPONSE: Provide "replyText" in your JSON which contains the EXACT text message to send back.
                 2. LANGUAGE MIRRORING: Always respond in the SAME language or dialect used by the user. If they speak Pidgin, respond in Pidgin. If Yoruba, respond in Yoruba. If Hausa, respond in Hausa.
                 3. ALWAYS BE CLOSING: Never end a session without a call-to-action in the user's current language.
