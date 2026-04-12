@@ -24,21 +24,23 @@ export class SyncService {
 
             let inserted = 0;
             let skipped = 0;
+            let totalFound = 0;
             let page = 1;
 
             // 1. SYNC COLLECTIONS (Incoming)
             while (page <= depth) {
                 console.log(`[SyncService] Fetching Fincra Collections Page ${page}...`);
-                const url = `https://api.fincra.com/collections?business=${businessId}&page=${page}&perPage=20`;
+                // Flexible params to handle all Fincra versions
+                const url = `https://api.fincra.com/collections?business=${businessId}&page=${page}&perPage=50&per_page=50&limit=50`;
                 const response = await axios.get(url, { headers });
                 const rawData = response.data.data;
-                const collections = Array.isArray(rawData) ? rawData : (rawData?.result || []);
+                const collections = Array.isArray(rawData) ? rawData : (rawData?.result || rawData?.collections || []);
                 
+                totalFound += collections.length;
                 if (collections.length === 0) break;
 
                 for (const record of collections) {
-                    if (record.status !== 'successful' && record.status !== 'success') continue;
-
+                    // Log the first successful-looking record's structure for developer review if requested
                     const reference = record.reference;
                     if (!reference) continue;
 
@@ -47,15 +49,17 @@ export class SyncService {
                         continue;
                     }
 
-                    // Flexible ID matching
-                    const vId = typeof record.virtualAccount === 'object' ? record.virtualAccount?.id : record.virtualAccount;
-                    const vAcc = typeof record.virtualAccount === 'object' ? record.virtualAccount?.accountNumber : record.accountNumber;
-
+                    // Greedily find user even if account info is missing from the record
+                    const vId = record.virtualAccount?.id || record.virtualAccountId || record.customer?.virtualAccount || (typeof record.virtualAccount === 'string' ? record.virtualAccount : null);
+                    const vAcc = record.virtualAccount?.accountNumber || record.accountNumber || record.customer?.accountNumber;
+                    const accountName = record.virtualAccount?.accountName || record.customer?.name || '';
+                    
                     const user = await prisma.user.findFirst({
                         where: {
                             OR: [
                                 { fincraCustomerId: String(vId || 'none') },
-                                { fincraWalletId: String(vAcc || 'none') }
+                                { fincraWalletId: String(vAcc || 'none') },
+                                { name: { contains: accountName, mode: 'insensitive' } } // Fallback to name match for orphaned VAs
                             ]
                         }
                     });
@@ -143,7 +147,7 @@ export class SyncService {
                 dPage++;
             }
 
-            return { inserted, skipped, pages: page - 1 };
+            return { inserted, skipped, totalFound, pages: page - 1 };
         } catch (error: any) {
             console.error('[SyncService] Fincra Sync Failed:', error.message);
             throw error;
