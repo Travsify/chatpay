@@ -338,12 +338,11 @@ export class WebhookController {
             const isVerified = user.kycStatus === 'VERIFIED' && user.fincraWalletId;
             
             if (!isVerified) {
-                const welcomeMsg = `✨ *Welcome to ChatPay: The World\'s First Truly Autonomous Bank* ✨\n\nI am your 24/7 AI financial companion.\n\n*To activate your secure global vault, choose your account type below:*`;
+            if (!isVerified) {
+                const welcomeMsg = `👋 Welcome to ChatPay!\nI am your personal money assistant right here on WhatsApp.\n\nI can help you:\n🏦 *Bank:* Get local & dollar accounts\n🚀 *Send:* Transfer money locally & abroad\n💡 *Bills:* Pay airtime, data & electricity\n🎮 *Betting:* Fund your bet accounts instantly\n₿ *Crypto:* Trade Bitcoin & Dollar Cards\n🤝 *Trust:* Hold money safely (Escrow)\n\nTo get started, are you opening this account for *Yourself* or for a *Registered Business*?`;
                 const welcomeMenu = [
-                    { id: "START_INDIVIDUAL", title: "👤 Personal Account", description: "Individual banking & savings" },
-                    { id: "START_BUSINESS", title: "💼 Business Account", description: "For registered companies/entities" },
-                    { id: "RESTART_FLOW", title: "🔄 Start Afresh", description: "Wipe progress and restart onboarding" },
-                    { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
+                    { id: "START_INDIVIDUAL", title: "👤 For Myself", description: "Personal local & global account" },
+                    { id: "START_BUSINESS", title: "💼 For a Business", description: "Registered company account" }
                 ];
                 try {
                     await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", welcomeMenu);
@@ -376,36 +375,21 @@ export class WebhookController {
             return;
         }
 
-        if (session.currentState === 'AWAITING_NAME' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_NAME')) {
-            if (rawText !== 'REFRESH') {
-                await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
-                const welcomeMsg = `Thanks ${rawText}! 🤝 To activate your secure vault, choose your account type below:`;
-                const accountMenu = [
-                    { id: "START_INDIVIDUAL", title: "👤 Personal Account", description: "Individual banking & savings" },
-                    { id: "START_BUSINESS", title: "💼 Business Account", description: "For registered companies/entities" },
-                    { id: "HOME", title: "🏠 Home", description: "Back to main menu" }
-                ];
-                await whapiService.sendList(phoneNumber, welcomeMsg, "Select Type", accountMenu);
-                await prisma.session.update({ 
-                    where: { id: session.id }, 
-                    data: { currentState: 'START', context: JSON.stringify({ ...context, name: rawText, lastMenuOptions: accountMenu }) } 
-                });
-            }
+        if (session.currentState === 'AWAITING_NAME' && rawText !== 'REFRESH') {
+            await prisma.user.update({ where: { id: user.id }, data: { name: rawText } });
+            await sendAndLog(`Awesome, ${rawText}! \nTo create your real bank account, just type your **11-digit BVN** and choose a **4-digit PIN** (e.g., 12345678901 1234). _(This is 100% secret and safe)_`, 'SIGNUP_KYC_PROMPT');
+            await prisma.session.update({ 
+                where: { id: session.id }, 
+                data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, name: rawText }) } 
+            });
             return;
         }
 
         if (rawText === 'START_INDIVIDUAL') {
-            const userName = user.name || context.name;
-            const msg = `🛡️ *Entering Secure Session*\n\nYou are now activating your global banking vault. To proceed, please reply with your **11-Digit BVN**.\n\n_Note: For your privacy, you should delete your message immediately after I verify it._\n\n*Need Help?* Dial *565*0#`;
-            
-            await whapiService.sendButtons(phoneNumber, msg, [
-                { id: "BACK", title: "🔙 Back" },
-                { id: "HOME", title: "🏠 Home" }
-            ]);
-            
+            await sendAndLog(`Great! Let's set up your personal account. What is your full legal name?`, 'SIGNUP_NAME_PROMPT');
             await prisma.session.update({ 
                 where: { id: session.id }, 
-                data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'START' }) } 
+                data: { currentState: 'AWAITING_NAME', context: JSON.stringify({ ...context, type: 'individual', previousState: 'START' }) } 
             });
             return;
         }
@@ -435,19 +419,23 @@ export class WebhookController {
         }
 
         if (session.currentState === 'AWAITING_KYC') {
-            const cleanBvn = rawText.replace(/\D/g, '');
-            if (cleanBvn.length === 11) {
+            const parts = rawText.trim().split(/\s+/);
+            const cleanBvn = parts[0]?.replace(/\D/g, '');
+            const cleanPin = parts[1]?.replace(/\D/g, '');
+
+            if (cleanBvn && cleanBvn.length === 11 && cleanPin && cleanPin.length >= 4) {
                 await sendAndLog(`Verifying your 11-digit BVN vault details... ⏳`, 'KYC_FLOW');
                 
                 await prisma.user.update({ 
                     where: { id: user.id }, 
                     data: { 
                         kycStatus: 'VERIFIED',
-                        bvn: cleanBvn
+                        bvn: cleanBvn,
+                        transactionPin: cleanPin
                     } 
                 });
                 
-                await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please **long-press and delete** your previous message containing your BVN to protect yourself from unauthorized access to your device.`, 'KYC_SECURITY_NOTICE');
+                await sendAndLog(`⚠️ *Security Notice*: Your BVN has been securely encrypted in our vault. Please **long-press and delete** your previous message to protect your personal identity.`, 'KYC_SECURITY_NOTICE');
                 await sendAndLog(`Verified! ✅ Finalizing your individual wallet setup with Fincra... 🏦`, 'KYC_VERIFIED');
                 try {
                     const wallet = await WalletService.setupUserWallet(user.id, 'individual');
@@ -1100,11 +1088,15 @@ export class WebhookController {
         switch (aiResult.intent) {
             case 'SIGNUP':
                 if (user.kycStatus === 'VERIFIED') {
-                    await sendAndLog(`Welcome back, ${user.name || 'valued customer'}! 🏦\n\nYour balance is currently up to date. How can I assist you today?\n\n- 💰 Check Balance\n- 🚀 Send Money\n- 💡 Pay Bills\n- 📄 Create Invoice`, 'SIGNUP_EXISTS');
+                    const blnce = await WalletService.getBalance(user.id);
+                    await sendAndLog(`Welcome back, ${user.name || 'friend'}! 👋\n\nYour available balance is ₦${blnce.toLocaleString()}.\n\nWould you like to send money, fund a betting account, pay a bill, or trade some crypto today?`, 'SIGNUP_EXISTS');
                 } else {
-                    const welcomeMsg = `✨ *Welcome to ChatPay!* ✨\n\nYour autonomous financial companion natively inside WhatsApp.\n\n*What I can do for you:*\n🏦 *Virtual Accounts*: Local & International bank details.\n🚀 *Transfers*: Swift payments to any Nigerian bank.\n💡 *Bills*: Airtime, Data, & Utility payments.\n₿ *Crypto & Cards*: Trade assets & gift cards instantly.\n\nTo get started with your secure wallet, please tell me your *Full Name*:`;
-                    await sendAndLog(welcomeMsg, 'SIGNUP_START');
-                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_NAME' } });
+                    const welcomeMsg = `👋 Welcome to ChatPay!\nI am your personal money assistant right here on WhatsApp.\n\nI can help you:\n🏦 *Bank:* Get local & dollar accounts\n🚀 *Send:* Transfer money locally & abroad\n💡 *Bills:* Pay airtime, data & electricity\n🎮 *Betting:* Fund your bet accounts instantly\n₿ *Crypto:* Trade Bitcoin & Dollar Cards\n🤝 *Trust:* Hold money safely (Escrow)\n\nTo get started, are you opening this account for *Yourself* or for a *Registered Business*?`;
+                    await whapiService.sendList(phoneNumber, welcomeMsg, "Select Type", [
+                        { id: "START_INDIVIDUAL", title: "👤 For Myself", description: "Personal local & global account" },
+                        { id: "START_BUSINESS", title: "💼 For a Business", description: "Registered company account" }
+                    ]);
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
                 }
                 break;
 
