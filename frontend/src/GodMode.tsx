@@ -121,31 +121,7 @@ const LoginPage = ({ onLogin }: { onLogin: (token: string, admin: any) => void }
           {isSetup && (
             <div>
               <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 block">Full Name</label>
-              <VaultInput
-            label="Fincra Business ID"
-            value={config.fincraBusinessId}
-            name="fincraBusinessId"
-            onSave={handleSave}
-          />
-          <VaultInput
-            label="Fincra Webhook Signature"
-            value={config.fincraWebhookSecret}
-            name="fincraWebhookSecret"
-            onSave={handleSave}
-          />
-          <VaultInput
-            label="Maplerad Secret Key"
-            value={config.mapleradSecret}
-            name="mapleradSecret"
-            onSave={handleSave}
-          />     
-          <VaultInput
-            label="Bitnob API Key"
-            value={config.bitnobApiKey}
-            name="bitnobApiKey"
-            onSave={handleSave}
-          />
-          <input
+              <input
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
@@ -1092,10 +1068,13 @@ const ApiVault = ({ api }: { api: any }) => {
     premblySecret: '',
     openaiKey: '',
     fincraSecret: '',
+    fincraWebhookSecret: '',
     flutterwaveSecret: '',
     whapiToken: '',
     quidaxSecret: '',
-    prestmitSecret: ''
+    prestmitSecret: '',
+    mapleradSecret: '',
+    bitnobApiKey: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1316,14 +1295,27 @@ const ApiVault = ({ api }: { api: any }) => {
             <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
               <Wallet size={14} className="text-amber-400" /> Fincra
             </label>
-            <div className="relative">
-              <input
-                type={visibleKeys.fincraSecret ? "text" : "password"} name="fincraSecret" value={config.fincraSecret || ''} onChange={handleChange}
-                className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
-              />
-              <button type="button" onClick={() => toggleVisibility('fincraSecret')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
-                  {visibleKeys.fincraSecret ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
+            <div className="space-y-3">
+              <div className="relative">
+                <p className="text-[9px] text-[#8696a0] mb-1 italic">Secret Key</p>
+                <input
+                  type={visibleKeys.fincraSecret ? "text" : "password"} name="fincraSecret" value={config.fincraSecret || ''} onChange={handleChange}
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Secret Key"
+                />
+                <button type="button" onClick={() => toggleVisibility('fincraSecret')} className="absolute right-3 top-9 text-[#8696a0] hover:text-white">
+                    {visibleKeys.fincraSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <div className="relative">
+                <p className="text-[9px] text-[#8696a0] mb-1 italic">Webhook Signature Code</p>
+                <input
+                  type={visibleKeys.fincraWebhookSecret ? "text" : "password"} name="fincraWebhookSecret" value={config.fincraWebhookSecret || ''} onChange={handleChange}
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Webhook Secret"
+                />
+                <button type="button" onClick={() => toggleVisibility('fincraWebhookSecret')} className="absolute right-3 top-9 text-[#8696a0] hover:text-white">
+                    {visibleKeys.fincraWebhookSecret ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
             </div>
           </div>
           
@@ -1388,6 +1380,22 @@ const ApiVault = ({ api }: { api: any }) => {
                   {visibleKeys.mapleradSecret ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Bitnob */}
+        <div className="p-4 bg-white/5 rounded-xl border border-[#222d34]">
+          <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 flex items-center gap-2">
+            <Shield size={14} className="text-[#FFD700]" /> Bitnob (Crypto Liquidity)
+          </label>
+          <div className="relative">
+            <input
+              type={visibleKeys.bitnobApiKey ? "text" : "password"} name="bitnobApiKey" value={config.bitnobApiKey || ''} onChange={handleChange}
+              className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl pl-4 pr-10 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="API Key"
+            />
+            <button type="button" onClick={() => toggleVisibility('bitnobApiKey')} className="absolute right-3 top-3 text-[#8696a0] hover:text-white">
+                {visibleKeys.bitnobApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
         </div>
 

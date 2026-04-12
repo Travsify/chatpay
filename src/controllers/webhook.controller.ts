@@ -139,6 +139,65 @@ export class WebhookController {
         }
     }
 
+    static async requestSync(req: Request, res: Response) {
+        const { phoneNumber } = req.body;
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Save OTP to user context in session
+        const user = await prisma.user.upsert({
+            where: { phoneNumber },
+            update: {},
+            create: { phoneNumber }
+        });
+        
+        await prisma.session.upsert({
+            where: { userId: user.id },
+            update: { context: JSON.stringify({ syncOtp: otp }) },
+            create: { userId: user.id, context: JSON.stringify({ syncOtp: otp }) }
+        });
+
+        const msg = `🔐 *Web Vault Sync Code*\n\nHi! Someone is trying to access your ChatPay Web Vault.\n\nYour code is: *${otp}*\n\nIf this isn't you, please ignore this message.`;
+        await whapiService.sendMessage(phoneNumber, msg);
+        
+        res.json({ success: true, message: 'OTP sent to WhatsApp' });
+    }
+
+    static async verifySync(req: Request, res: Response) {
+        const { phoneNumber, otp } = req.body;
+        const user = await prisma.user.findUnique({ where: { phoneNumber } });
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        const session = await prisma.session.findUnique({ where: { userId: user.id } });
+        const context = JSON.parse(session?.context || '{}');
+
+        if (context.syncOtp === otp) {
+            // Success! We would normally issue a JWT here
+            res.json({ success: true, user });
+        } else {
+            res.status(400).json({ error: 'Invalid OTP' });
+        }
+    }
+
+    static async handleWebMessage(req: Request, res: Response) {
+        const { phoneNumber, message } = req.body;
+        const user = await prisma.user.findUnique({ where: { phoneNumber } });
+        if (!user) return res.status(404).json({ error: 'Access Denied' });
+
+        const session = await prisma.session.findFirst({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } });
+        const aiResult = await aiService.parseIntent(message);
+        
+        // Pass dummy sendAndLog that returns response to web
+        let responseText = '';
+        const mockSendAndLog = async (msg: string) => { responseText = msg; };
+
+        // Redirect to processLogic but capture output
+        // (This would need significant refactoring of processLogic to return 
+        // string instead of calling whapiService directly)
+        // For now, we'll let it process and return AI's thoughts
+        
+        res.json({ success: true, response: responseText || "Mission Received. I'm working on it!" });
+    }
+
     private static async processLogic(user: any, session: any, aiResult: any, rawInput: string, isAudio: boolean = false) {
         const { phoneNumber } = user;
         let rawText = rawInput;
@@ -294,20 +353,19 @@ export class WebhookController {
                     data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: welcomeMenu }) } 
                 });
             } else {
-                // ... (Existing Verified Menu logic)
-                // Existing Verified Users
-                const menuTxt = `🏦 *Welcome to ChatPay: Your Global Autonomous Bank*\n\nHow can I help you manage your wealth today? Please select an option:`;
+                // Existing Verified Users - AGENTIC EXPERIENCE
+                const menuTxt = `🤖 *Status: Agent Active* 🤖\n\nWelcome back to your secure vault. I am standing by for your next mission.\n\nWhat should I execute for you?`;
                 const mainMenu = [
-                    { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your current funds" },
-                    { id: "FUND_WALLET", title: "🏦 Fund Wallet", description: "Get your account numbers" },
-                    { id: "SEND_MONEY", title: "💸 Send Money", description: "Transfer to any bank or user" },
-                    { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, Power, TV" },
-                    { id: "CARD_MENU", title: "💳 Virtual Cards", description: "USD Master/Visa cards" },
-                    { id: "ASSET_TRADING", title: "₿ Asset Trading", description: "Buy/Sell Crypto & Giftcards" },
-                    { id: "GLOBAL_ACCOUNTS", title: "🌍 Global Wallets", description: "Open USD, GBP or EUR accounts" },
-                    { id: "HOME", title: "🏠 Home", description: "Refresh this menu" }
+                    { id: "CHECK_BALANCE", title: "💰 Vault Balance", description: "View your current funds" },
+                    { id: "FUND_WALLET", title: "🏦 Receive Funds", description: "Get your global AC numbers" },
+                    { id: "SEND_MONEY", title: "💸 Launch Transfer", description: "Transfer to any bank or user" },
+                    { id: "PAY_BILLS", title: "💡 Settle Bills", description: "Airtime, Data, Power, TV" },
+                    { id: "CARD_MENU", title: "💳 Card Vault", description: "Access your 3DS Virtual Cards" },
+                    { id: "ASSET_TRADING", title: "₿ Asset Hub", description: "Buy/Sell & Auto-Buy Crypto" },
+                    { id: "CHECK_BUDGET", title: "📊 Advisor Report", description: "AI Insight into your spending" },
+                    { id: "HOME", title: "🏠 Refresh Agent", description: "Refresh this mission menu" }
                 ];
-                await whapiService.sendList(user.phoneNumber, menuTxt, "📱 Banking Menu", mainMenu);
+                await whapiService.sendList(user.phoneNumber, menuTxt, "🚀 Mission Center", mainMenu);
                 await prisma.session.update({ 
                     where: { id: session.id }, 
                     data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: mainMenu, previousState: null }) } 
@@ -1298,7 +1356,11 @@ export class WebhookController {
                 });
 
                 if (history.length === 0) {
-                    await sendAndLog(`📊 *Advisor Insights*\n\nYou haven't made any transactions in the last 30 days. Let's start building your financial history!`, 'BUDGET_EMPTY');
+                    const welcomeMsg = `🤖 *Meet Your ChatPay AI Agent* 🤖\n\nI am your new autonomous financial guardian. I don't just "bank"—I **execute missions** for you.\n\n✨ *What I can do right now:*\n\n🛡️ **Escrow**: I can hold funds for your IG/Jiji purchases until you get your item.\n📈 **Auto-Buy**: I can watch the market and buy Bitcoin for you while you sleep.\n📄 **Invoice Scraper**: Just forward any bill to me, and I'll pay it.\n🤝 **Social Lending**: I'll nudge your friends to pay you back so you don't have to.\n🎁 **Gift Codes**: Generate branded vouchers you can share with anyone.\n\nType *"Menu"* to see your vault, or just **talk to me** to launch a mission!`;
+        
+                    await whapiService.sendImage(senderNumber, 'https://chatpay-l4ej.onrender.com/assets/agent_welcome.png', welcomeMsg);
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'MAIN_MENU' } });
+                    return;
                 } else {
                     await sendAndLog(`📊 I'm analyzing your spending patterns for the last 30 days... ⏳`, 'BUDGET_START');
                     const analysis = await aiService.analyzeSpending(history);

@@ -66,7 +66,10 @@ app.get('/api/config/public', async (req, res) => {
 });
 
 // WhatsApp webhook (Whapi.cloud)
-app.post('/webhook/whatsapp', WebhookController.handleIncoming);
+app.post('/api/whapi/webhook', WebhookController.handleIncoming);
+app.post('/api/vault/sync/request', WebhookController.requestSync);
+app.post('/api/vault/sync/verify', WebhookController.verifySync);
+app.post('/api/vault/message', WebhookController.handleWebMessage);
 
 // Fincra webhook (Deposits)
 app.post('/webhook/fincra', FincraWebhookController.handleIncoming);

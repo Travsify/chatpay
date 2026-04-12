@@ -12,3 +12,10 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
 )
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  (window as any).deferredPrompt = e;
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.classList.remove('hidden');
+});

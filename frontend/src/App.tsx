@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import GodMode from './GodMode';
+import WebVault from './WebVault';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Wallet, ShieldCheck, FileText, Send, User, Copy, Check, TrendingUp, CreditCard, ChevronRight, ChevronDown, Briefcase, Users, Smartphone, Star } from 'lucide-react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
@@ -436,6 +437,21 @@ const Home = () => {
               <a href="#testimonials" className="hover:text-white transition-colors">Testimonials</a>
             </div>
             <div className="flex items-center gap-4">
+              <button 
+                id="install-btn"
+                className="hidden md:flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-[#25D366] hover:text-white transition-colors"
+                onClick={() => {
+                  const deferredPrompt = (window as any).deferredPrompt;
+                  if (deferredPrompt) {
+                    deferredPrompt.prompt();
+                    deferredPrompt.userChoice.then((choiceResult: any) => {
+                      if (choiceResult.outcome === 'accepted') (window as any).deferredPrompt = null;
+                    });
+                  }
+                }}
+              >
+                Get the App
+              </button>
               <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="bg-[#25D366] hover:bg-[#128C7E] text-[#0b141a] px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-[#25D366]/30 transition-all hover:-translate-y-0.5">
                 Launch App
               </a>
@@ -471,10 +487,10 @@ const Home = () => {
              
              <div className="flex flex-col sm:flex-row items-stretch justify-center gap-4 px-4 sm:px-0">
                <a href={`https://wa.me/${waNumber}?text=Hi`} target="_blank" rel="noopener noreferrer" className="px-6 py-4 md:px-8 md:py-4 bg-[#25D366] text-[#0b141a] rounded-2xl font-black text-base md:text-lg hover:bg-[#128C7E] transition-colors flex items-center justify-center gap-2 shadow-[0_0_30px_rgba(37,211,102,0.3)]">
-                 <Send size={20} /> Text to Bank
+                 <Send size={20} /> Launch on WhatsApp
                </a>
-               <Link to="/dashboard" className="px-6 py-4 md:px-8 md:py-4 bg-surface border border-border text-white rounded-2xl font-bold text-base md:text-lg hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
-                 <Wallet size={20} /> Web Dashboard
+               <Link to="/vault" className="px-6 py-4 md:px-8 md:py-4 bg-surface border border-border text-white rounded-2xl font-bold text-base md:text-lg hover:bg-white/5 transition-colors flex items-center justify-center gap-2">
+                 <Smartphone size={20} /> Enter Web Vault
                </Link>
              </div>
 
@@ -516,6 +532,46 @@ const Home = () => {
              })}
            </div>
         </section>
+
+        {/* AGENT MISSION SHOWCASE */}
+        <section id="features" className="py-20 md:py-32 px-4 md:px-6 relative border-t border-white/5">
+          <div className="max-w-7xl mx-auto">
+            <FadeInSection>
+              <div className="text-center mb-16 md:mb-24 px-2">
+                <h2 className="text-[2.5rem] sm:text-4xl md:text-5xl lg:text-6xl font-black mb-6 tracking-tight text-white leading-[1.1]">The Autonomous <br/> <span className="text-[#25D366]">Command Center</span></h2>
+                <p className="text-sm md:text-base text-[#8696a0] max-w-2xl mx-auto leading-relaxed">ChatPay is not just a wallet. It is a persistent AI Agent that executes multi-step financial missions on your behalf.</p>
+              </div>
+            </FadeInSection>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 hover:cursor-default">
+              {[
+                { icon: ShieldCheck, title: "Smart Escrow", desc: "Buy safely on social media. Your Agent holds funds until you confirm delivery.", hint: "Escrow Mission" },
+                { icon: TrendingUp, title: "Buy the Dip", desc: "The Agent watches market prices and buys Bitcoin automatically at your target floor.", hint: "Auto-Investment" },
+                { icon: FileText, title: "Document Vision", desc: "Just forward a PDF or Image invoice. The Agent reads it and prepares the payment.", hint: "Optical Scraper" },
+                { icon: Users, title: "Social Lending", desc: "Lend funds and let the Agent handle the awkward follow-up reminders.", hint: "Debt Collection" },
+                { icon: CreditCard, title: "Voucher Minting", desc: "Create secure, shareable gift tokens that anyone can redeem instantly.", hint: "Digital Gifting" },
+                { icon: Smartphone, title: "Agentic Sync", desc: "Seamlessly move between WhatsApp and the Web Vault with cross-platform identity.", hint: "Zero-Knowledge Sync" },
+                { icon: Wallet, title: "Always Active", desc: "A 24/7 background heartbeat that settles bills and trades while you are offline.", hint: "Background Executor" },
+                { icon: Star, title: "AI Advisor", desc: "Get proactive weekly insights into your spending habits and wealth growth.", hint: "Financial Mentor" },
+              ].map((f, i) => (
+                <FadeInSection key={i} delay={i * 0.1}>
+                  <div className="group relative bg-[#111b21] p-8 rounded-[2rem] border border-[#222d34] hover:border-[#25D366]/40 transition-all duration-500 h-full flex flex-col shadow-xl">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#25D366]/5 rounded-bl-[100px]" />
+                    <div className="w-14 h-14 rounded-2xl bg-[#25D366]/10 flex items-center justify-center mb-6 text-[#25D366]">
+                      <f.icon size={28} />
+                    </div>
+                    <div className="mb-2">
+                        <span className="text-[10px] uppercase font-bold tracking-[0.2em] text-[#00a884] opacity-70">{f.hint}</span>
+                    </div>
+                    <h3 className="text-xl font-bold mb-3 text-white">{f.title}</h3>
+                    <p className="text-sm text-[#8696a0] leading-relaxed flex-1">{f.desc}</p>
+                  </div>
+                </FadeInSection>
+              ))}
+            </div>
+          </div>
+        </section>
+
 
         {/* HOW IT WORKS */}
         <section id="how-it-works" className="py-20 md:py-32 px-4 md:px-6 max-w-7xl mx-auto overflow-hidden">
@@ -790,6 +846,7 @@ function App() {
             </>
           } />
           <Route path="/pay/:id" element={<Checkout />} />
+          <Route path="/vault" element={<WebVault />} />
           <Route path="/admin" element={<GodMode />} />
         </Routes>
       </AnimatePresence>
