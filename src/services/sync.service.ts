@@ -28,8 +28,8 @@ export class SyncService {
 
             while (page <= depth) {
                 console.log(`[SyncService] Fetching Fincra Page ${page}...`);
-                // Using /core/collections (V2) which is more reliable for newer accounts
-                const url = `https://api.fincra.com/core/collections?page=${page}&limit=20&business=${businessId}`;
+                // Standard collections endpoint (V1) is often just /collections
+                const url = `https://api.fincra.com/collections?business=${businessId}&page=${page}&perPage=20`;
                 const response = await axios.get(url, { headers });
                 const rawData = response.data.data;
                 const collections = Array.isArray(rawData) ? rawData : (rawData?.result || []);
