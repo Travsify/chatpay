@@ -126,8 +126,9 @@ export class AdminController {
                 note: 'User balances are automatically correct based on these transactions.' 
             });
         } catch (error: any) {
-            console.error('[Admin] Fincra Sync Error:', error.message);
-            res.status(500).json({ error: error.message || 'Failed to sync from Fincra' });
+            const fincraError = error.response?.data?.message || error.response?.data?.error || error.message;
+            console.error('[Admin] Fincra Sync Details:', JSON.stringify(error.response?.data || {}));
+            res.status(500).json({ error: fincraError });
         }
     }
 
