@@ -1510,12 +1510,7 @@ export class WebhookController {
                 } else {
                     const { currency } = aiResult.entities || {};
                     if (!currency) {
-                        // User did not specify the currency, dynamically ask them using AI's reply or fallback text
-                        if (aiResult.replyText) {
-                            await sendAndLog(aiResult.replyText, 'ACCOUNT_PROMPT');
-                        } else {
-                            await sendAndLog(`I can definitely set up a new account for you! Which currency would you like? (e.g., NGN, USD, GBP, or EUR)`, 'ACCOUNT_PROMPT');
-                        }
+                        await sendAndLog(`🌍 I can definitely set up a new global account for you! Which currency would you like? (e.g., USD, GBP, or EUR)`, 'ACCOUNT_PROMPT');
                     } else {
                         const targetCurrency = currency.toUpperCase();
                         await sendAndLog(`Generating your *${targetCurrency}* Virtual Account... 🏦 ⏳`, 'ACCOUNT_START');
@@ -1802,9 +1797,13 @@ export class WebhookController {
                     return;
                 }
                 if (rawText !== 'REFRESH' && !isHi && !isMenu && rawText !== 'MENU') {
-                    // Always show the current menu if we don't understand, to prevent the user from being stuck
-                    await sendAndLog("I'm here to help, but I'm not sure about that request. 🤖 Let's stick to the menu options below:", 'FALLBACK_MENU');
-                    return WebhookController.processLogic(user, session, aiResult, 'REFRESH');
+                    if (aiResult.replyText) {
+                        await sendAndLog(aiResult.replyText, 'CONVERSATIONAL_RESPONSE');
+                    } else {
+                        // Always show the current menu if we don't understand, to prevent the user from being stuck
+                        await sendAndLog("I'm here to help, but I'm not sure about that request. 🤖 Let's stick to the menu options below:", 'FALLBACK_MENU');
+                        return WebhookController.processLogic(user, session, aiResult, 'REFRESH');
+                    }
                 }
                 break;
         }

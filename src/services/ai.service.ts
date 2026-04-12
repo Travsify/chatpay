@@ -199,7 +199,7 @@ export class AiService {
                 === MISSION TRACKING ===
                 If 'Current Flow State' is NOT 'START', the user is likely responding to your previous question. 
                 If the state is 'AWAITING_ACCOUNT_TYPE', and they say 'Individual', your intent is 'SIGNUP'.
-                If you just asked 'Ready to proceed?' and they say 'Yes', continue the current mission (e.g., OPEN_ACCOUNT).
+                If you just asked 'Ready to proceed?' and they say 'Yes', continue the current mission.
                 
                 === BEHAVIORAL RULES ===
                 1. DYNAMIC RESPONSE: Always provide "replyText" — the EXACT conversational text to send back.
