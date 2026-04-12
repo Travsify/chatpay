@@ -151,6 +151,8 @@ export class WebhookController {
                     }
                 });
 
+                console.log(`\n💬 [CONVERSATION] INBOUND from ${user.phoneNumber}:\n   "${rawText}"\n   Intent: ${aiResult.intent}`);
+
                 await WebhookController.processLogic(user, session, aiResult, rawText, isAudio);
 
                 // Mark processed
@@ -267,6 +269,8 @@ export class WebhookController {
                     await whapiService.sendMessage(phoneNumber, message);
                 }
             }
+            console.log(`\n🤖 [CONVERSATION] OUTBOUND to ${phoneNumber}:\n   "${message.replace(/\n/g, ' ')}"`);
+            
             await prisma.conversationLog.create({
                 data: {
                     userId: user.id,
