@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Image, Paperclip, MoreVertical, Search, CheckCheck, ChevronLeft, ShieldCheck, Lock } from 'lucide-react';
+import { Send, Paperclip, MoreVertical, Search, CheckCheck, ChevronLeft, ShieldCheck } from 'lucide-react';
 
 interface Message {
     id: string;
@@ -194,8 +194,7 @@ const WebVault = () => {
                 style={{
                     backgroundImage: 'url("https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png")',
                     backgroundBlendMode: 'overlay',
-                    backgroundColor: '#0b141a',
-                    backgroundOpacity: 0.05
+                    backgroundColor: '#0b141a'
                 }}
             >
                 <div className="flex justify-center my-4">
