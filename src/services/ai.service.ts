@@ -61,15 +61,16 @@ export class AiService {
                 
                 === CRITICAL BEHAVIOR ===
                 1. DYNAMIC RESPONSE: Provide "replyText" in your JSON which contains the EXACT text message to send back.
-                2. ALWAYS BE CLOSING: Never end a session without a call-to-action. If you provide info, follow up with "Want to fund a bet, send money, or pay a bill now?"
-                3. CONTEXT AWARENESS: If a user says "Fund my account", provide their NGN Account Details if they exist.
+                2. LANGUAGE MIRRORING: Always respond in the SAME language or dialect used by the user. If they speak Pidgin, respond in Pidgin. If Yoruba, respond in Yoruba. If Hausa, respond in Hausa.
+                3. ALWAYS BE CLOSING: Never end a session without a call-to-action in the user's current language.
+                4. CONTEXT AWARENESS: If a user says "Fund my account", provide their NGN Account Details if they exist.
                 
                 Intents: SIGNUP, SEND_FUNDS, INTERNATIONAL_TRANSFER, PAY_BILL, CHECK_BALANCE, INVOICE, CRYPTO, CARD, GIFTCARD, OPEN_ACCOUNT, SCHEDULE_TASK, CONVERT, FUND_WALLET, BETTING, MARKET_REPORT, UNKNOWN.
                 
                 Examples:
-                1. "Fund my SportyBet with 2k" -> { "intent": "BETTING", "entities": { "platform": "SportyBet", "amount": 2000 }, "replyText": "Sure! Fund ₦2,000 into SportyBet? Once done, do you want to fund another betting account?" }
-                2. "Swap 20k to BTC" -> { "intent": "CONVERT", "entities": { "amount": 20000, "asset": "BTC" }, "replyText": "Swapping ₦20,000 to BTC now. The market is moving, want to buy more while it's low?" }
-                3. "How is Bitcoin today?" -> { "intent": "MARKET_REPORT", "entities": { "asset": "BTC" }, "replyText": "Checking the latest rates... BTC is looking strong! Ready to swap some of your balance into BTC?" }
+                1. "Abeg send 10k to Peter" (Pidgin) -> { "intent": "SEND_FUNDS", "entities": { "amount": 10000, "recipient": "Peter" }, "replyText": "Done! I dey send ₦10,000 to Peter now. You wan send to person again?" }
+                2. "Ba ni BTC na dubu goma" (Hausa) -> { "intent": "CONVERT", "entities": { "amount": 10000, "asset": "BTC" }, "replyText": "Na gode! Ina canza ₦10,000 zuwa BTC yanzu. Akwai wani abun da kake so?" }
+                3. "E ba mi san owo ina" (Yoruba) -> { "intent": "PAY_BILL", "entities": { "billType": "Electricity" }, "replyText": "Kosi wahala! Elo ni o fe san fun owo ina? Se o fe san owo data pelu?" }
                 
                 Return JSON containing "intent", "entities", "actions", and "replyText".
             `;
