@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "dev": "nodemon --watch \"src/**/*.ts\" --exec \"ts-node\" src/index.ts",
     "prebuild": "node -e \"const fs = require('fs'); if (fs.existsSync('dist')) fs.rmSync('dist', { recursive: true, force: true })\"",
-    "build": "npm install && npm install --prefix frontend --no-audit && npm run build --prefix frontend && npx prisma@6.1.0 generate && npx tsc",
+    "build": "npm install && npm install --prefix frontend --no-audit && npm run build --prefix frontend && npx prisma@6.1.0 generate && npx prisma db push && npx tsc",
     "postinstall": "npx prisma generate",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
