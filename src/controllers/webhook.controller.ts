@@ -115,7 +115,29 @@ export class WebhookController {
                 let session = await prisma.session.findFirst({ where: { userId: user.id }, orderBy: { updatedAt: 'desc' } });
                 if (!session) session = await prisma.session.create({ data: { userId: user.id, currentState: 'START' } });
 
-                const aiResult = await aiService.parseIntent(rawText);
+                let contextBalance = 0;
+                let contextAccNum = '';
+                let contextBankName = '';
+                if (user.kycStatus === 'VERIFIED') {
+                    try {
+                        const { WalletService } = await import('../services/wallet.service.js');
+                        contextBalance = await WalletService.getBalance(user.id);
+                        const vAcc = await prisma.virtualAccount.findFirst({ where: { userId: user.id } });
+                        if (vAcc) {
+                            contextAccNum = vAcc.accountNumber;
+                            contextBankName = vAcc.bankName || 'WEMA BANK';
+                        }
+                    } catch (e) {
+                        console.error('[Context] Failed to load wallet context:', e);
+                    }
+                }
+
+                const aiResult = await aiService.parseIntent(rawText, {
+                    kycStatus: user.kycStatus,
+                    balance: contextBalance,
+                    accountNumber: contextAccNum,
+                    bankName: contextBankName
+                });
 
                 await prisma.conversationLog.create({
                     data: {
@@ -1067,6 +1089,15 @@ export class WebhookController {
         if (rawText === 'CRYPTO_TRADE') {
             await sendAndLog(`Okay! ₿ Which asset would you like to buy? (e.g. "Buy $100 USDT")`, 'CRYPTO_PROMPT');
             return;
+        }
+
+        // Intercept intents that should purely use the AI's dynamic contextual conversational brain
+        if (['FUND_WALLET', 'CHECK_BALANCE', 'UNKNOWN'].includes(aiResult.intent) && aiResult.replyText) {
+             // Exception: if checked balance but no wallet yet, let the switch block handle onboarding recovery
+             if (!(aiResult.intent === 'CHECK_BALANCE' && !user.fincraCustomerId)) {
+                 await sendAndLog(aiResult.replyText, aiResult.intent);
+                 return;
+             }
         }
 
         // 2. Process Intent
