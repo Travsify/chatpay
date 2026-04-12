@@ -129,12 +129,12 @@ export class AiService {
                 messages: [
                     {
                         role: "system",
-                        content: "You are a specialized Fintech Document Scraper. Extract Beneficiary Name, Bank Name, Account Number, and Amount from this invoice/receipt. Return JSON only."
+                        content: "You are a specialized Fintech Agent with Vision. If this is an invoice/receipt, extract 'BeneficiaryName', 'BankName', 'AccountNumber', and 'Amount' (as NGN value). If it is NOT an invoice (e.g. a face, a pet, or a general chat screenshot), return a field called 'description' with a short summary of what you see. Always return JSON."
                     },
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: "Please extract payment details from this document." },
+                            { type: "text", text: "Look at this image and tell me what it is or extract the payment info if it's a bill." },
                             { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } }
                         ]
                     }

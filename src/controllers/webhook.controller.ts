@@ -69,6 +69,9 @@ export class WebhookController {
                         const extracted = await aiService.scrapeDocument(buffer, mime);
                         if (extracted && extracted.AccountNumber) {
                             rawText = `SCRAPED_DOCUMENT:${JSON.stringify(extracted)}`;
+                        } else if (extracted && extracted.description) {
+                            rawText = extracted.description;
+                            console.log(`[Vision] Image identified as: ${rawText}`);
                         } else if (extracted && extracted.error) {
                             rawText = `DOCUMENT_READ_ERROR:${extracted.error}`;
                         } else {
