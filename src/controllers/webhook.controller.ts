@@ -258,15 +258,18 @@ export class WebhookController {
                     await whapiService.sendMessage(phoneNumber, message);
                 }
             } else {
+                // ALWAYS send text first for safety, record-keeping, and searchability
+                await whapiService.sendMessage(phoneNumber, message);
+
+                // If user used voice, we respond with voice as well for that premium concierge feel
                 if (isAudio) {
                     try {
                         const audioBuffer = await VoiceService.textToSpeech(message);
                         await whapiService.sendAudio(phoneNumber, audioBuffer);
                     } catch (e) {
-                        await whapiService.sendMessage(phoneNumber, message);
+                        console.error('[Voice Response Error]:', e);
+                        // We already sent the text, so no need to fallback to text here
                     }
-                } else {
-                    await whapiService.sendMessage(phoneNumber, message);
                 }
             }
             console.log(`\n🤖 [CONVERSATION] OUTBOUND to ${phoneNumber}:\n   "${message.replace(/\n/g, ' ')}"`);
