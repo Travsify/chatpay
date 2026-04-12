@@ -44,7 +44,7 @@ export class WhapiService {
 
         // PRIORITY 2: Emergency Hardcoded Fallback
         if (!rawToken) {
-            rawToken = 'eoR2mA57NDEn40E6OrfrD6y5PcajTBjx';
+            rawToken = 'DC6bhz6a8djbAAt7uGEv2JtNxCpNGeZg';
         }
 
         // FINAL SANITIZATION

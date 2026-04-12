@@ -137,12 +137,29 @@ export class WebhookController {
                     }
                 }
 
+                // ===== LONG-TERM MEMORY: Build rich AI context =====
+                let conversationHistory: any[] = [];
+                let recentTransactions = 'None';
+                try {
+                    conversationHistory = await aiService.getConversationHistory(user.id, 20);
+                    recentTransactions = await aiService.getRecentTransactions(user.id, 8);
+                } catch (e) {
+                    console.error('[Memory] Failed to load conversation history:', e);
+                }
+
                 const aiResult = await aiService.parseIntent(rawText, {
                     kycStatus: user.kycStatus,
                     balance: contextBalance,
                     accountNumber: contextAccNum,
                     bankName: contextBankName,
-                    currentState: session.currentState
+                    currentState: session.currentState,
+                    userName: user.name || undefined,
+                    phoneNumber: user.phoneNumber,
+                    email: user.email || undefined,
+                    tier: user.tier,
+                    memberSince: user.createdAt?.toLocaleDateString() || 'Unknown',
+                    recentTransactions,
+                    conversationHistory
                 });
 
                 await prisma.conversationLog.create({
