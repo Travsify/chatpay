@@ -3,8 +3,11 @@ import { fincraService } from './fincra.service.js';
 import { bitnobService } from './bitnob.service.js';
 import { whapiService } from './whapi.service.js';
 import { ReceiptService } from './receipt.service.js';
+import { SyncService } from './sync.service.js';
 
 export class AgentExecutor {
+    private static lastSyncAt: number = 0;
+    
     /**
      * The background engine that processes all PENDING missions in the Task Ledger.
      */
@@ -19,7 +22,15 @@ export class AgentExecutor {
                 include: { user: true }
             });
 
-            if (pendingTasks.length === 0) return;
+            if (pendingTasks.length === 0) {
+                // Throttle transaction sync to every 5 minutes
+                const now = Date.now();
+                if (now - this.lastSyncAt > 300000) { 
+                    this.lastSyncAt = now;
+                    SyncService.autoSync().catch(e => console.error('[Agent Executor] Auto-Sync Error:', e.message));
+                }
+                return;
+            }
 
             console.log(`[Agent Executor] Found ${pendingTasks.length} missions to execute.`);
 
