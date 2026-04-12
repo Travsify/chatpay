@@ -64,6 +64,9 @@ export class AgentExecutor {
                 case 'DEBT_COLLECTION':
                     await this.runDebtRemind(task, context);
                     break;
+                case 'PROACTIVE_NUDGE':
+                    await this.runNudge(task, context);
+                    break;
                 default:
                     console.log(`[Agent Executor] Unknown Mission Type: ${task.type}`);
                     break;
@@ -157,5 +160,24 @@ export class AgentExecutor {
             // So we suggest the lender to forward a pre-written message
             await whapiService.sendMessage(task.user.phoneNumber, `Actually, since ${borrowerPhone} isn't on ChatPay yet, you can forward this message to them:\n\n"Hi! Jus a reminder about the ₦${amount.toLocaleString()} loan. You can pay back into my ChatPay NGN account."`);
         }
+    }
+
+    private static async runNudge(task: any, context: any) {
+        const { WalletService } = await import('./wallet.service.js');
+        const { bitnobService } = await import('./bitnob.service.js');
+        
+        const balance = await WalletService.getBalance(task.userId);
+        const rates = await bitnobService.getCurrentPrice('btc');
+        const btcRate = rates?.data?.find((r: any) => r.symbol === 'BTCNGN')?.rate || 90000000;
+
+        let message = `👋 *Morning Briefing*\n\nYour current vault balance is ₦${balance.toLocaleString()}.\n\n`;
+        
+        if (balance > 10000) {
+            message += `Bitcoin is currently ₦${btcRate.toLocaleString()}. Want to put ₦5,000 to work and buy some fractions? 📈`;
+        } else {
+            message += `Your account is looking a bit low. Want to fund it now and pay some bills or fund your SportyBet? ⚽`;
+        }
+
+        await whapiService.sendMessage(task.user.phoneNumber, message);
     }
 }

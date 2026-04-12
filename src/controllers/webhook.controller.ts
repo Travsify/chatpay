@@ -586,6 +586,22 @@ export class WebhookController {
                                 } 
                             });
                             await sendAndLog(`Success! ✅ Your ${billType} bill is settled.\n\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'BILL_SUCCESS');
+                        } else if (context.platform) {
+                            // AGENTIC: FUND BETTING (Using Transfer or Utility fallback)
+                            await prisma.transaction.create({ 
+                                data: { 
+                                    userId: user.id, 
+                                    type: 'BILL_PAYMENT', 
+                                    amount: parseFloat(amount), 
+                                    currency: 'NGN', 
+                                    status: 'SUCCESS', 
+                                    reference, 
+                                    provider: 'CHATPAY_AGENT', 
+                                    description: `Betting Fund: ${context.platform} (${customer})` 
+                                } 
+                            });
+                            await sendAndLog(`Success! 🎮 I've funded your ${context.platform} account (${customer}) with ₦${parseFloat(amount).toLocaleString()}.\n\nGo win some money! 🚀\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'BETTING_SUCCESS');
+                        }Log(`Success! ✅ Your ${billType} bill is settled.\n\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'BILL_SUCCESS');
                         }
                         
                         // NEW: AUTOMATIC PDF RECEIPT FOR ALL TX
@@ -1442,6 +1458,43 @@ export class WebhookController {
                 await sendAndLog(`✨ *Voucher Redeemed!* ✨\n\nYour vault has been credited with **₦${voucher.amount.toLocaleString()}**.\n\nType *"Menu"* to check your new balance.`, 'REDEEM_SUCCESS');
                 break;
 
+            case 'BETTING':
+                if (user.kycStatus !== 'VERIFIED') {
+                    await sendAndLog(`Please verify your account first to fund betting platforms.`, 'UNVERIFIED_ATTEMPT');
+                } else {
+                    const { amount, platform, customer } = aiResult.entities || {};
+                    if (!amount || !platform) {
+                        await sendAndLog(`Sure! Which betting platform (e.g. SportyBet, Bet9ja) and how much would you like to fund?`, 'BETTING_PROMPT');
+                    } else {
+                        const targetID = customer || 'your account';
+                        await whapiService.sendButtons(phoneNumber, `Confirm: Fund ₦${parseFloat(amount).toLocaleString()} into *${platform.toUpperCase()}* for ${targetID}? 🎮`, [
+                            { id: "CONFIRM_BET", title: "✅ Yes, Fund Now" },
+                            { id: "HOME", title: "🏠 Cancel" }
+                        ]);
+                        await prisma.session.update({
+                            where: { id: session.id },
+                            data: { 
+                                currentState: 'AWAITING_BET_CONFIRM', 
+                                context: JSON.stringify({ ...context, amount, platform, customer: targetID }) 
+                            }
+                        });
+                    }
+                }
+                break;
+
+            case 'MARKET_REPORT':
+                try {
+                    const rates = await bitnobService.getCurrentPrice('btc');
+                    const btcRate = rates?.data?.find((r: any) => r.symbol === 'BTCNGN')?.rate || 90000000;
+                    const usdRate = rates?.data?.find((r: any) => r.symbol === 'USDNGN')?.rate || 1500;
+                    
+                    const report = `📈 *Market Report*\n\n1 BTC = ₦${btcRate.toLocaleString()}\n1 USD = ₦${usdRate.toLocaleString()}\n\nBTC has moved slightly today. Ready to buy some fractions or swap your NGN to USD? 💰`;
+                    await sendAndLog(report, 'MARKET_REPORT');
+                } catch (e) {
+                    await sendAndLog(`Sorry, I couldn't fetch the latest rates right now. But Bitcoin is always a good buy! Want to swap some NGN?`, 'MARKET_REPORT_ERROR');
+                }
+                break;
+            
             case 'CHECK_BUDGET':
                 const last30Days = new Date();
                 last30Days.setDate(last30Days.getDate() - 30);

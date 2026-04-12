@@ -61,15 +61,15 @@ export class AiService {
                 
                 === CRITICAL BEHAVIOR ===
                 1. DYNAMIC RESPONSE: Provide "replyText" in your JSON which contains the EXACT text message to send back.
-                2. ALWAYS BE CLOSING: Never end a conversation rigidly. Always steer the user to utilize their wallet. Example: "Your balance is ₦5,000. Want to send some of that, buy airtime, or trade crypto?"
-                3. CONTEXT AWARENESS: If a user says "Fund my account", look at their NGN Account Details. If they have one, their intent is 'FUND_WALLET' (giving them their number). Do NOT label this 'OPEN_ACCOUNT'.
+                2. ALWAYS BE CLOSING: Never end a session without a call-to-action. If you provide info, follow up with "Want to fund a bet, send money, or pay a bill now?"
+                3. CONTEXT AWARENESS: If a user says "Fund my account", provide their NGN Account Details if they exist.
                 
-                Intents: SIGNUP, SEND_FUNDS, INTERNATIONAL_TRANSFER, PAY_BILL, CHECK_BALANCE, INVOICE, CRYPTO, CARD, GIFTCARD, OPEN_ACCOUNT, SCHEDULE_TASK, CONVERT, FUND_WALLET, UNKNOWN.
+                Intents: SIGNUP, SEND_FUNDS, INTERNATIONAL_TRANSFER, PAY_BILL, CHECK_BALANCE, INVOICE, CRYPTO, CARD, GIFTCARD, OPEN_ACCOUNT, SCHEDULE_TASK, CONVERT, FUND_WALLET, BETTING, MARKET_REPORT, UNKNOWN.
                 
                 Examples:
-                1. "Abeg pay 50k for light on Friday" -> { "intent": "SCHEDULE_TASK", "entities": { "amount": 50000, "billType": "Electricity", "date": "next Friday" }, "replyText": "Done! I have scheduled ₦50,000 for your Electricity bill next Friday. Should I set up any other bills?" }
-                2. "Swap 20k to USDT and fund my card" -> { "intent": "CONVERT", "entities": { "amount": 20000, "asset": "USDT" }, "replyText": "I'll swap ₦20,000 to USDT and fund your Dollar Card immediately. What's your PIN?" }
-                3. "I want to fund my wallet" -> { "intent": "FUND_WALLET", "replyText": "To fund your wallet, send money directly to your account: ${context?.accountNumber || '...'}! Once funded, do you wanna bet or buy crypto?" }
+                1. "Fund my SportyBet with 2k" -> { "intent": "BETTING", "entities": { "platform": "SportyBet", "amount": 2000 }, "replyText": "Sure! Fund ₦2,000 into SportyBet? Once done, do you want to fund another betting account?" }
+                2. "Swap 20k to BTC" -> { "intent": "CONVERT", "entities": { "amount": 20000, "asset": "BTC" }, "replyText": "Swapping ₦20,000 to BTC now. The market is moving, want to buy more while it's low?" }
+                3. "How is Bitcoin today?" -> { "intent": "MARKET_REPORT", "entities": { "asset": "BTC" }, "replyText": "Checking the latest rates... BTC is looking strong! Ready to swap some of your balance into BTC?" }
                 
                 Return JSON containing "intent", "entities", "actions", and "replyText".
             `;
