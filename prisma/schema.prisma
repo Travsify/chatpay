@@ -115,6 +115,7 @@ model SystemConfig {
   premblySecret   String?
   openaiKey       String?
   fincraSecret      String?
+  fincraBusinessId  String?
   fincraWebhookSecret String?
   flutterwaveSecret String?
   whapiToken        String?

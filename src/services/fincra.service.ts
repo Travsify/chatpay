@@ -12,8 +12,9 @@ export class FincraService {
     }
 
     private async getHeaders() {
-        const apiKey = await this.getApiKey();
-        const businessId = process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6';
+        const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+        const apiKey = config?.fincraSecret || process.env.FINCRA_SECRET_KEY || '';
+        const businessId = config?.fincraBusinessId || process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6';
         
         if (!apiKey) {
             console.error('[Fincra] CRITICAL: No API Key found in DB or Environment!');

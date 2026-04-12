@@ -11,7 +11,7 @@ export class SyncService {
         try {
             const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
             const fincraSecret = config?.fincraSecret || process.env.FINCRA_SECRET_KEY;
-            const businessId = process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6';
+            const businessId = config?.fincraBusinessId || process.env.FINCRA_BUSINESS_ID || '693c5533957c9000120117a6';
 
             if (!fincraSecret) return { error: 'No Fincra API Key' };
 

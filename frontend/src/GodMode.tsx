@@ -1344,6 +1344,13 @@ const ApiVault = ({ api }: { api: any }) => {
                 </button>
               </div>
               <div className="relative">
+                <p className="text-[9px] text-[#8696a0] mb-1 italic">Business ID</p>
+                <input
+                  type="text" name="fincraBusinessId" value={config.fincraBusinessId || ''} onChange={handleChange}
+                  className="w-full bg-[#0b141a] border border-[#222d34] rounded-xl px-4 py-3 text-sm text-white focus:border-[#25D366] focus:outline-none" placeholder="Business ID"
+                />
+              </div>
+              <div className="relative">
                 <p className="text-[9px] text-[#8696a0] mb-1 italic">Webhook Signature Code</p>
                 <input
                   type={visibleKeys.fincraWebhookSecret ? "text" : "password"} name="fincraWebhookSecret" value={config.fincraWebhookSecret || ''} onChange={handleChange}
