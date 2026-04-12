@@ -468,10 +468,42 @@ export class WebhookController {
                 { id: "CREATE_CARD", title: "✨ Create New Card", description: "Generate a USD Master/Visa card" },
                 { id: "MY_CARDS", title: "📂 View My Cards", description: "See active cards & balances" },
                 { id: "TOPUP_CARD", title: "💰 Top Up Card", description: "Add funds to your virtual card" },
-                { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
+                { id: "BACK", title: "🔙 Back", description: "Return" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'CARD_MENU', context: JSON.stringify({ ...context, previousState: 'START' }) }});
+            return;
+        }
+
+        if (rawText === 'CREATE_CARD') {
+            await sendAndLog(`🌐 *Virtual Card Creation*\n\nInitiating your USD Master/Visa card... 💳`, 'CARD_START');
+            try {
+                const card = await mapleradService.createVirtualCard(user.id, 'USD', 10); // Default $10 funding
+                const msg = `Success! 🛡️ Your USD Virtual Card is active.\n\n*Card Selection*: ${card?.data?.card_type || 'Visa'}\n*Balance*: $10.00\n*Status*: ACTIVE\n\nType *"My Cards"* to see your card details!`;
+                await whapiService.sendButtons(phoneNumber, msg, [{ id: "MY_CARDS", title: "📂 View Card Details" }, { id: "HOME", title: "🏠 Home" }]);
+            } catch (e: any) {
+                await sendAndLog(`Card issuance failed: ${e.message}`, 'CARD_FAILED');
+            }
+            return;
+        }
+
+        if (rawText === 'MY_CARDS') {
+            await sendAndLog(`📂 Fetching your active virtual cards... ⏳`, 'CARDS_FETCHING');
+            try {
+                const cards = await mapleradService.getCards(user.id);
+                if (!cards || cards.length === 0) {
+                    await whapiService.sendButtons(phoneNumber, `You don't have any virtual cards yet. 💳`, [{ id: "CREATE_CARD", title: "✨ Create New Card" }, { id: "HOME", title: "🏠 Home" }]);
+                } else {
+                    let msg = `💳 *Your Virtual Cards*\n\n`;
+                    cards.forEach((c: any, i: number) => {
+                        msg += `${i+1}. *${c.name || 'USD Card'}* (**** ${c.last4})\nStatus: ${c.status}\nBalance: $${(c.balance / 100).toFixed(2)}\n\n`;
+                    });
+                    msg += `_To see full details (CVV/Expiry), please use the God Mode dashboard for now for your security._`;
+                    await whapiService.sendButtons(phoneNumber, msg, [{ id: "HOME", title: "🏠 Home" }]);
+                }
+            } catch (e: any) {
+                await sendAndLog(`Failed to fetch cards: ${e.message}`, 'CARDS_FETCH_FAILED');
+            }
             return;
         }
 

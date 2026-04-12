@@ -19,6 +19,7 @@ model User {
   tier             Int               @default(0)
   fincraWalletId   String?
   fincraCustomerId String?
+  mapleradCustomerId String?
   suspended        Boolean           @default(false)
   transactionPin   String?
   createdAt        DateTime          @default(now())
