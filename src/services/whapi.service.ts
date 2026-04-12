@@ -1,5 +1,5 @@
 import axios from 'axios';
-import prisma from '../utils/prisma.js';
+import prisma from '../utils/prisma';
 
 export class WhapiService {
     private apiUrl: string;
@@ -99,6 +99,28 @@ export class WhapiService {
         }
     }
 
+    async sendDocument(to: string, mediaUrl: string, filename: string, caption?: string) {
+        const token = await this.getToken();
+        try {
+            const apiUrl = await this.getUrl();
+            const response = await axios.post(`${apiUrl}/messages/document`, {
+                to: to,
+                media: mediaUrl,
+                filename: filename,
+                caption: caption
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('Error sending Whapi document:', error.response?.data || error.message);
+            throw error;
+        }
+    }
+
     async registerWebhook(webhookUrl: string) {
         const token = await this.getToken();
         try {
@@ -160,7 +182,6 @@ export class WhapiService {
         const payload = {
             to: numericTo,
             body: { text: text },
-            typing_time: 0,
             action: {
                 buttons: buttons.map(b => ({
                     type: 'quick_reply',
@@ -190,7 +211,6 @@ export class WhapiService {
         const payload = {
             to: numericTo,
             body: { text: text },
-            typing_time: 0,
             action: {
                 button,
                 sections: [
@@ -214,6 +234,43 @@ export class WhapiService {
             console.error('[Whapi] List send failed, falling back to text:', error.response?.data || error.message);
             const listItems = options.map((opt, i) => `${i + 1}. *${opt.title}*`).join('\n');
             await this.sendMessage(numericTo, `${text}\n\n${listItems}`);
+        }
+    }
+
+    async sendFlow(to: string, text: string, flowId: string, flowToken: string, cta: string = 'Open Form') {
+        const token = await this.getToken();
+        const apiUrl = await this.getUrl();
+        const numericTo = to.replace(/\D/g, '');
+        const payload = {
+            to: numericTo,
+            type: 'interactive',
+            interactive: {
+                type: 'flow',
+                body: { text: text },
+                action: {
+                    name: 'flow',
+                    parameters: {
+                        flow_message_version: '3',
+                        flow_token: flowToken,
+                        flow_id: flowId,
+                        flow_cta: cta,
+                        flow_action: 'navigate',
+                        flow_action_payload: {
+                            screen: 'SIGNUP_SCREEN',
+                            data: {}
+                        }
+                    }
+                }
+            }
+        };
+
+        try {
+            await axios.post(`${apiUrl}/messages/interactive`, payload, {
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
+            });
+        } catch (error: any) {
+            console.error('[Whapi] Flow send failed:', error.response?.data || error.message);
+            throw error;
         }
     }
 

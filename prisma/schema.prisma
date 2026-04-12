@@ -26,9 +26,11 @@ model User {
   updatedAt        DateTime          @updatedAt
   transactions     Transaction[]
   sessions         Session[]
+  scheduledTasks   ScheduledTask[]
   conversations    ConversationLog[]
   virtualAccounts  VirtualAccount[]
   businessKyb      BusinessKyb?
+  vouchers         Voucher[]
 }
 
 // ===== TRANSACTIONS =====
@@ -114,6 +116,7 @@ model SystemConfig {
   premblySecret   String?
   openaiKey       String?
   fincraSecret      String?
+  fincraWebhookSecret String?
   flutterwaveSecret String?
   whapiToken        String?
   whapiApiUrl       String?
@@ -129,8 +132,10 @@ model SystemConfig {
   
   // Fiat Markups
   usdExchangeRate   Float    @default(1500.0)
-  usdMarkup         Float    @default(50.0)
-  eurMarkup         Float    @default(60.0)
+  usdMarkup          Float    @default(50.0)
+  fincraWebhookSecret String?
+  bitnobApiKey        String?
+  whapiToken         String   @default("YOUR_WHAPI_TOKEN")
   gbpMarkup         Float    @default(80.0)
   
   // Asset Markups
@@ -182,6 +187,12 @@ enum AdminRole {
   SUPER_ADMIN
   OPERATOR
   VIEWER
+}
+
+enum Role {
+  USER
+  OPERATOR
+  SUPER_ADMIN
 }
 
 enum MessageDirection {

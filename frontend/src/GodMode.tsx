@@ -121,7 +121,31 @@ const LoginPage = ({ onLogin }: { onLogin: (token: string, admin: any) => void }
           {isSetup && (
             <div>
               <label className="text-[10px] font-bold text-[#8696a0] uppercase tracking-widest mb-2 block">Full Name</label>
-              <input
+              <VaultInput
+            label="Fincra Business ID"
+            value={config.fincraBusinessId}
+            name="fincraBusinessId"
+            onSave={handleSave}
+          />
+          <VaultInput
+            label="Fincra Webhook Signature"
+            value={config.fincraWebhookSecret}
+            name="fincraWebhookSecret"
+            onSave={handleSave}
+          />
+          <VaultInput
+            label="Maplerad Secret Key"
+            value={config.mapleradSecret}
+            name="mapleradSecret"
+            onSave={handleSave}
+          />     
+          <VaultInput
+            label="Bitnob API Key"
+            value={config.bitnobApiKey}
+            name="bitnobApiKey"
+            onSave={handleSave}
+          />
+          <input
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}

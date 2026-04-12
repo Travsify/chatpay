@@ -13,10 +13,14 @@ import { AuthController } from './controllers/auth.controller.js';
 import { authMiddleware, requireRole } from './middleware/auth.middleware.js';
 import prisma from './utils/prisma.js';
 import { whapiService } from './services/whapi.service.js';
+import { AgentExecutor } from './services/agent.executor.js';
 
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+// ===== STATIC FILES (Receipts) =====
+app.use('/receipts', express.static(path.join(__dirname, '../public/receipts')));
 
 // ===== PUBLIC ROUTES =====
 
@@ -125,4 +129,9 @@ app.listen(PORT, '0.0.0.0', async () => {
     } catch (e) {
         console.error('   Webhook: Sync Failed on Startup');
     }
+
+    // ===== START AGENT HEARTBEAT =====
+    setInterval(() => {
+        AgentExecutor.processMissions().catch(err => console.error('[Heartbeat Error]:', err));
+    }, 60000); // Check every minute
 });

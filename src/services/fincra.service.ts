@@ -167,13 +167,143 @@ export class FincraService {
     }
 
     /**
+     * Get list of supported banks.
+     */
+    async getBanks(country: string = 'Nigeria') {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.get(`${baseUrl}/core/banks?country=${country}`, {
+                headers: await this.getHeaders()
+            });
+            return response.data.data || [];
+        } catch (error: any) {
+            console.error('[Fincra] Error listing banks:', error.response?.data || error.message);
+            return [];
+        }
+    }
+
+    /**
+     * Resolve account number to get Account Name.
+     */
+    async resolveAccount(accountNumber: string, bankCode: string) {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.get(`${baseUrl}/core/accounts-resolve?accountNumber=${accountNumber}&bankCode=${bankCode}`, {
+                headers: await this.getHeaders()
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fincra] Error resolving account:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Verification failed. Please check account details.');
+        }
+    }
+
+    /**
+     * UTILITIES: Pay Airtime, Data, Power or Cable TV via Fincra
+     */
+    async payUtility(type: 'airtime' | 'data' | 'power' | 'cabletv', data: any) {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/utilities/${type}/pay`, data, {
+                headers: await this.getHeaders()
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error(`[Fincra] Utility Payment Error (${type}):`, error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Utility payment failed');
+        }
+    }
+
+    /**
+     * CONVERSIONS: Get a quote for swapping currency (e.g. NGN to USD)
+     */
+    async createConversionQuote(amount: number, from: string, to: string) {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/conversions/quotes`, {
+                amount,
+                sourceCurrency: from,
+                destinationCurrency: to
+            }, {
+                headers: await this.getHeaders()
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fincra] Conversion Quote Error:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to get exchange rate');
+        }
+    }
+
+    /**
+     * CONVERSIONS: Execute currency swap using a quote ID
+     */
+    async convertCurrency(quoteReference: string) {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/conversions`, {
+                quoteReference
+            }, {
+                headers: await this.getHeaders()
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fincra] Conversion Error:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Conversion failed');
+        }
+    }
+
+    /**
+     * CHECKOUT: Create a one-time payment link for wallet funding
+     */
+    async createPaymentLink(amount: number, currency: string, customer: { name: string, email: string }, redirectUrl?: string) {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/payment-links`, {
+                amount,
+                currency,
+                customer,
+                redirectUrl: redirectUrl || 'https://chatpayapp.online',
+                type: 'one-time'
+            }, {
+                headers: await this.getHeaders()
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fincra] Payment Link Error:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to generate payment link');
+        }
+    }
+
+    /**
+     * INTERNATIONAL PAYOUTS: Send funds to global banks
+     */
+    async internationalTransfer(data: {
+        amount: number,
+        sourceCurrency: string,
+        destinationCurrency: string,
+        beneficiary: any,
+        paymentDestination: 'bank_account' | 'mobile_money'
+    }) {
+        try {
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/disbursements/payouts`, data, {
+                headers: await this.getHeaders()
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('[Fincra] International Transfer Error:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'International transfer failed');
+        }
+    }
+
+    /**
      * Send a payout (bank transfer).
      * Endpoint: POST /disbursements/payouts
      */
     async transferFunds(data: { 
         amount: number, 
         currency: string, 
-        destinationAddress: string, 
+        destinationAddress?: string, 
         paymentDestination: 'bank_account',
         beneficiary: {
             firstName: string,

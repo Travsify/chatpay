@@ -50,7 +50,7 @@ export class MapleradService {
 
             const customerId = await this.getOrCreateCustomer(userId);
 
-            const response = await axios.post('https://api.maplerad.com/v1/issuing/cards', {
+            const response = await axios.post('https://api.maplerad.com/v1/issuing', {
                 customer_id: customerId,
                 type: 'VIRTUAL',
                 currency: currency,

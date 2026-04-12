@@ -2,12 +2,26 @@ import { Request, Response } from 'express';
 import prisma from '../utils/prisma.js';
 import { whapiService } from '../services/whapi.service.js';
 import { EmailService } from '../services/email.service.js';
+import crypto from 'crypto';
 
 export class FincraWebhookController {
     static async handleIncoming(req: Request, res: Response) {
         try {
             const payload = req.body;
-            console.log('[Fincra Webhook] Received:', JSON.stringify(payload));
+            const signature = req.headers['x-fincra-signature'];
+            
+            const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
+            const secret = config?.fincraWebhookSecret || process.env.FINCRA_WEBHOOK_SECRET;
+
+            if (secret) {
+                const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(payload)).digest('hex');
+                if (hash !== signature) {
+                    console.error('[Fincra Webhook] Invalid signature detected');
+                    return res.status(401).send('Unauthorized');
+                }
+            }
+
+            console.log('[Fincra Webhook] Received Verified:', JSON.stringify(payload));
             
             // Typical Fincra webhook structure for Virtual Account deposit
             // event: 'collection.successful' or 'virtualaccount.payment.received'
@@ -81,12 +95,24 @@ export class FincraWebhookController {
             
             try {
                 await whapiService.sendMessage(user.phoneNumber, alertMessage);
-                console.log(`[Fincra Webhook] Sent credit alert to ${user.phoneNumber}`);
+                
+                // NEW: AUTOMATIC PDF RECEIPT
+                const { ReceiptService } = await import('../services/receipt.service.js');
+                await ReceiptService.generateAndSend(user.phoneNumber, {
+                    type: 'Deposit (Incoming)',
+                    amount: `₦${amount.toLocaleString()}`,
+                    reference: reference,
+                    status: 'SUCCESS',
+                    date: new Date().toLocaleString(),
+                    recipient: user.name || 'You'
+                });
+
+                console.log(`[Fincra Webhook] Sent credit alert + PDF to ${user.phoneNumber}`);
                 if (user.email) {
                     await EmailService.sendReceipt(user.email, { type: 'Deposit (Incoming)', amount, reference, balance });
                 }
             } catch (notifyErr) {
-                console.error(`[Fincra Webhook] Failed to send Whapi alert to ${user.phoneNumber}`, notifyErr);
+                console.error(`[Fincra Webhook] Failed to notify ${user.phoneNumber}`, notifyErr);
             }
 
             return res.status(200).send('Processed');

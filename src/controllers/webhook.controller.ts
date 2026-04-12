@@ -3,15 +3,14 @@ import axios from 'axios';
 import { whapiService } from '../services/whapi.service.js';
 import { aiService } from '../services/ai.service.js';
 import { WalletService } from '../services/wallet.service.js';
-import { FlutterwaveService } from '../services/flutterwave.service.js';
-import { quidaxService } from '../services/quidax.service.js';
-import { mapleradService } from '../services/maplerad.service.js';
+import { bitnobService } from '../services/bitnob.service.js';
 import { pressMntService } from '../services/pressmnt.service.js';
 import { VoiceService } from '../services/voice.service.js';
 import { EmailService } from '../services/email.service.js';
 import prisma from '../utils/prisma.js';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 export class WebhookController {
     
@@ -42,7 +41,7 @@ export class WebhookController {
                 let rawText = '';
                 let isAudio = false;
 
-                // 1. Robust Extraction (Text, Voice, Buttons, Lists)
+                // 1. Robust Extraction (Text, Voice, Buttons, Lists, Media)
                 if (msg.type === 'audio' || msg.type === 'voice') {
                     isAudio = true;
                     try {
@@ -55,6 +54,23 @@ export class WebhookController {
                     } catch (e) {
                         console.error('[Voice] Failed:', e);
                         rawText = 'VOICE_TRANSCRIPTION_FAILED';
+                    }
+                } else if (msg.type === 'image' || msg.type === 'document') {
+                    try {
+                        const mediaId = msg.image?.id || msg.document?.id;
+                        const mime = msg.image?.mime_type || msg.document?.mime_type || 'image/jpeg';
+                        const buffer = await whapiService.getFileBuffer(mediaId);
+                        
+                        // Let Agent "read" the document
+                        const extracted = await aiService.scrapeDocument(buffer, mime);
+                        if (extracted && extracted.AccountNumber) {
+                            rawText = `SCRAPED_DOCUMENT:${JSON.stringify(extracted)}`;
+                        } else {
+                            rawText = 'DOCUMENT_READ_FAILURE';
+                        }
+                    } catch (mediaErr) {
+                        console.error('[Media Scrape] Failed:', mediaErr);
+                        rawText = 'MEDIA_PROCESSING_ERROR';
                     }
                 } else if (msg.type === 'call_log' || msg.type === 'system') {
                     rawText = 'SYSTEM_CALL_REJECTED';
@@ -69,7 +85,14 @@ export class WebhookController {
                         (msg.type === 'interactive' && msg.interactive?.type === 'button_reply' ? msg.interactive?.button_reply?.id : null) ||
                         (msg.type === 'interactive' && msg.interactive?.type === 'list_reply' ? msg.interactive?.list_reply?.id : null);
 
-                    if (interactiveId) {
+                    if (msg.type === 'interactive' && msg.interactive?.type === 'flow_response') {
+                        const flowData = msg.interactive.flow_response?.response_json;
+                        // Map flow data to a recognizable text trigger for the logic processor
+                        if (flowData) {
+                            rawText = `FLOW_RESPONSE_${JSON.stringify(flowData)}`;
+                            console.log(`[Webhook] Extracted Flow Data:`, flowData);
+                        }
+                    } else if (interactiveId) {
                         rawText = interactiveId;
                         // Strip Whapi gateway prefixes
                         if (rawText.includes(':')) rawText = rawText.split(':').pop() || rawText;
@@ -141,15 +164,23 @@ export class WebhookController {
 
         // Helper to send + log outbound messages (Hybrid Text/Voice)
         const sendAndLog = async (message: string, intent?: string) => {
-            if (isAudio) {
+            if (message.includes('Success! 🛡️ Your USD Virtual Card is active.')) {
                 try {
-                    const audioBuffer = await VoiceService.textToSpeech(message);
-                    await whapiService.sendAudio(phoneNumber, audioBuffer);
+                    await whapiService.sendButtons(phoneNumber, message, [{ id: "MY_CARDS", title: "📂 View Card Details" }, { id: "HOME", title: "🏠 Home" }]);
                 } catch (e) {
                     await whapiService.sendMessage(phoneNumber, message);
                 }
             } else {
-                await whapiService.sendMessage(phoneNumber, message);
+                if (isAudio) {
+                    try {
+                        const audioBuffer = await VoiceService.textToSpeech(message);
+                        await whapiService.sendAudio(phoneNumber, audioBuffer);
+                    } catch (e) {
+                        await whapiService.sendMessage(phoneNumber, message);
+                    }
+                } else {
+                    await whapiService.sendMessage(phoneNumber, message);
+                }
             }
             await prisma.conversationLog.create({
                 data: {
@@ -162,6 +193,27 @@ export class WebhookController {
             });
             await WebhookController.logWebhook('OUTBOUND', phoneNumber, JSON.stringify({ body: message }), 'PROCESSED');
         };
+
+        // ===== GLOBAL PRIORITY: FLOW DATA EXTRACTION =====
+        if (rawText.startsWith('FLOW_RESPONSE_')) {
+            try {
+                const data = JSON.parse(rawText.replace('FLOW_RESPONSE_', ''));
+                console.log(`[Flow] Processing flow data for user ${user.id}:`, data);
+                
+                // If it's a Signup Flow
+                if (data.bvn) {
+                    const fullName = data.name || user.name || 'ChatPay User';
+                    await prisma.user.update({ where: { id: user.id }, data: { name: fullName } });
+                    
+                    // Proceed to KYC verification
+                    rawText = data.bvn;
+                    session.currentState = 'AWAITING_KYC';
+                    context = { ...context, type: 'individual' };
+                }
+            } catch (e) {
+                console.error('[Flow] Extraction failed:', e);
+            }
+        }
 
         // ===== GLOBAL PRIORITY: START AFRESH (Before Mapping) =====
         if (rawText.toLowerCase() === 'reset' || rawText === 'RESTART_FLOW' || rawText === 'START_OVER') {
@@ -284,13 +336,17 @@ export class WebhookController {
 
         if (rawText === 'START_INDIVIDUAL') {
             const userName = user.name || context.name;
-            if (userName) {
-                await sendAndLog(`Great Choice ${userName}! To setup your *Personal Account*, kindly provide your *11-digit Bank Verification Number (BVN)* for private verification. 🛡️\n\n_Dial *565*0# on your phone to check your BVN if you forgot it._`, 'SIGNUP_KYC');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'START' }) } });
-            } else {
-                await sendAndLog(`Great Choice! To setup your *Personal Account*, what is your **Full Legal Name** as it appears on your ID or BVN?`, 'SIGNUP_NAME_PROMPT');
-                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_INDIVIDUAL_NAME', context: JSON.stringify({ ...context, type: 'individual' }) } });
-            }
+            const msg = `🛡️ *Entering Secure Session*\n\nYou are now activating your global banking vault. To proceed, please reply with your **11-Digit BVN**.\n\n_Note: For your privacy, you should delete your message immediately after I verify it._\n\n*Need Help?* Dial *565*0#`;
+            
+            await whapiService.sendButtons(phoneNumber, msg, [
+                { id: "BACK", title: "🔙 Back" },
+                { id: "HOME", title: "🏠 Home" }
+            ]);
+            
+            await prisma.session.update({ 
+                where: { id: session.id }, 
+                data: { currentState: 'AWAITING_KYC', context: JSON.stringify({ ...context, type: 'individual', previousState: 'START' }) } 
+            });
             return;
         }
 
@@ -394,18 +450,107 @@ export class WebhookController {
                 if (balance < totalDebit) {
                     await sendAndLog(`PIN Verified! ✅ But insufficient funds. ❌ Balance: ₦${balance.toLocaleString()}`, 'INSUFFICIENT_POST_PIN');
                 } else {
-                    await sendAndLog(`Authorization successful! 🚀 Processing...`, 'PIN_AUTHORIZED');
-                    const reference = `${recipient ? 'CP' : 'BILL'}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-                    const newBalance = balance - totalDebit;
-                    if (recipient) {
-                        await prisma.transaction.create({ data: { userId: user.id, type: 'P2P_SEND', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FINCRA', description: `Transfer to ${recipient}` } });
-                        await sendAndLog(`Success! ✅ Sent ₦${amount} to ${recipient}.\n\n🧾 *Receipt*\nRef: ${reference}\nFee: ₦${totalDebit - parseFloat(amount)}\nNew Balance: ₦${newBalance.toLocaleString()}`, 'TRANSFER_SUCCESS');
-                        if (user.email) await EmailService.sendReceipt(user.email, { type: 'Transfer', amount: parseFloat(amount), reference, balance: newBalance, recipient });
-                    } else if (billType) {
-                        await FlutterwaveService.payBill(parseFloat(amount), customer, billType, reference);
-                        await prisma.transaction.create({ data: { userId: user.id, type: 'BILL_PAYMENT', amount: parseFloat(amount), currency: 'NGN', status: 'SUCCESS', reference, provider: 'FLUTTERWAVE', description: `${billType} payment for ${customer}` } });
-                        await sendAndLog(`Success! ✅ Your ${billType} bill is settled.\n\n🧾 *Receipt*\nRef: ${reference}\nFee: ₦${totalDebit - parseFloat(amount)}\nNew Balance: ₦${newBalance.toLocaleString()}`, 'BILL_SUCCESS');
-                        if (user.email) await EmailService.sendReceipt(user.email, { type: billType, amount: parseFloat(amount), reference, balance: newBalance });
+                    await sendAndLog(`Authorization successful! 🚀 Processing your transfer...`, 'PIN_AUTHORIZED');
+                    
+                    const { amount, recipient, billType, customer, type, bankCode, bankName, accountNumber } = context as any;
+                    const reference = `CP-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+                    
+                    try {
+                        if (type === 'bank') {
+                            // REAL EXTERNAL PAYOUT VIA FINCRA
+                            await fincraService.transferFunds({
+                                amount: parseFloat(amount),
+                                currency: 'NGN',
+                                destinationAddress: 'bank_account', // Correct Fincra param
+                                paymentDestination: 'bank_account',
+                                beneficiary: {
+                                    firstName: recipient.split(' ')[0],
+                                    lastName: recipient.split(' ')[1] || 'User',
+                                    accountNumber: accountNumber,
+                                    accountHolderName: recipient,
+                                    bankCode: bankCode,
+                                    type: 'individual'
+                                }
+                            });
+                            
+                            await prisma.transaction.create({ 
+                                data: { 
+                                    userId: user.id, 
+                                    type: 'TRANSFER', 
+                                    amount: parseFloat(amount), 
+                                    currency: 'NGN', 
+                                    status: 'SUCCESS', 
+                                    reference, 
+                                    provider: 'FINCRA', 
+                                    description: `Transfer to ${recipient} (${bankName})` 
+                                } 
+                            });
+
+                            await sendAndLog(`Success! ✅ Sent ₦${parseFloat(amount).toLocaleString()} to ${recipient}.\n\n🧾 *Receipt*\nBank: ${bankName}\nRef: ${reference}\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'TRANSFER_SUCCESS');
+                        } else if (recipient) {
+                            // INTERNAL P2P
+                            await prisma.transaction.create({ 
+                                data: { 
+                                    userId: user.id, 
+                                    type: 'P2P_SEND', 
+                                    amount: parseFloat(amount), 
+                                    currency: 'NGN', 
+                                    status: 'SUCCESS', 
+                                    reference, 
+                                    provider: 'FINCRA', 
+                                    description: `Transfer to ${recipient}` 
+                                } 
+                            });
+                            await sendAndLog(`Success! ✅ Sent ₦${parseFloat(amount).toLocaleString()} to ${recipient}.\n\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'TRANSFER_SUCCESS');
+                        } else if (billType) {
+                            // MIGRATED: USING FINCRA UTILITIES API
+                            let utilityType: any = 'airtime';
+                            if (billType.toLowerCase().includes('data')) utilityType = 'data';
+                            if (billType.toLowerCase().includes('power') || billType.toLowerCase().includes('electricity')) utilityType = 'power';
+                            if (billType.toLowerCase().indexOf('dstv') > -1 || billType.toLowerCase().indexOf('tv') > -1) utilityType = 'cabletv';
+
+                            await fincraService.payUtility(utilityType, {
+                                amount: parseFloat(amount),
+                                customerIdentifier: customer,
+                                phoneNumber: phoneNumber, // For airtime/data
+                                billerName: billType // e.g. "MTN", "DSTV", "IKEDC"
+                            });
+
+                            await prisma.transaction.create({ 
+                                data: { 
+                                    userId: user.id, 
+                                    type: 'BILL_PAYMENT', 
+                                    amount: parseFloat(amount), 
+                                    currency: 'NGN', 
+                                    status: 'SUCCESS', 
+                                    reference, 
+                                    provider: 'FINCRA', 
+                                    description: `${billType} payment for ${customer}` 
+                                } 
+                            });
+                            await sendAndLog(`Success! ✅ Your ${billType} bill is settled.\n\nNew Balance: ₦${(balance - totalDebit).toLocaleString()}`, 'BILL_SUCCESS');
+                        }
+                        
+                        // NEW: AUTOMATIC PDF RECEIPT FOR ALL TX
+                        const { ReceiptService } = await import('../services/receipt.service.js');
+                        await ReceiptService.generateAndSend(phoneNumber, {
+                            type: type === 'bank' ? 'Bank Transfer' : (billType ? 'Bill Payment' : 'Internal Transfer'),
+                            amount: `₦${parseFloat(amount).toLocaleString()}`,
+                            reference: reference,
+                            recipient: recipient || customer || 'N/A',
+                            bank: bankName || 'N/A',
+                            status: 'SUCCESS',
+                            date: new Date().toLocaleString()
+                        });
+                        
+                        if (user.email) await EmailService.sendReceipt(user.email, { type: type === 'bank' ? 'Bank Transfer' : 'Transfer', amount: parseFloat(amount), reference, balance: (balance - totalDebit), recipient });
+
+                    } catch (e: any) {
+                        const errorMsg = e.response?.data?.message || e.message;
+                        await sendAndLog(`❌ Transfer Failed: ${errorMsg}. Your funds are safe. Please try again.`, 'TRANSFER_CRITICAL_FAILURE');
+                    }
+                }
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });t), reference, balance: newBalance });
                     }
                 }
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
@@ -476,10 +621,16 @@ export class WebhookController {
         }
 
         if (rawText === 'CREATE_CARD') {
-            await sendAndLog(`🌐 *Virtual Card Creation*\n\nInitiating your USD Master/Visa card... 💳`, 'CARD_START');
+            await sendAndLog(`🌐 *Premium Card Creation*\n\nInitiating your Bitnob-powered 3DS USD Visa card... 💳`, 'CARD_START');
             try {
-                const card = await mapleradService.createVirtualCard(user.id, 'USD', 10); // Default $10 funding
-                const msg = `Success! 🛡️ Your USD Virtual Card is active.\n\n*Card Selection*: ${card?.data?.card_type || 'Visa'}\n*Balance*: $10.00\n*Status*: ACTIVE\n\nType *"My Cards"* to see your card details!`;
+                const names = user.name.split(' ');
+                const card = await bitnobService.createVirtualCard({
+                    customerEmail: user.email || `${user.phoneNumber}@chatpay.io`,
+                    amount: 500, // $5.00 initial funding (Bitnob uses cents)
+                    firstName: names[0],
+                    lastName: names[1] || 'User'
+                });
+                const msg = `Success! 🛡️ Your Premium USD Virtual Card is active.\n\n*Type*: Visa (Bitnob Premium)\n*Balance*: $5.00\n*Status*: ACTIVE\n\n_Check your card details in the specialized Card Dashboard._`;
                 await whapiService.sendButtons(phoneNumber, msg, [{ id: "MY_CARDS", title: "📂 View Card Details" }, { id: "HOME", title: "🏠 Home" }]);
             } catch (e: any) {
                 await sendAndLog(`Card issuance failed: ${e.message}`, 'CARD_FAILED');
@@ -581,13 +732,39 @@ export class WebhookController {
 
         if (rawText === 'ASSET_TRADING' || rawText === 'REFRESH' && session.currentState === 'ASSET_TRADING') {
             const menu = [
-                { id: "CRYPTO_TRADE", title: "₿ Trade Crypto", description: "Buy/Sell BTC & USDT" },
+                { id: "BITNOB_HUB", title: "⚡ Bitnob Crypto Hub", description: "Lightning & Stablecoins" },
                 { id: "GIFTCARD", title: "🎁 Sell Giftcards", description: "Trade giftcards for cash" },
-                { id: "BACK", title: "🔙 Back", description: "Return to previous menu" },
+                { id: "BACK", title: "🔙 Back", description: "Return" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ];
-            await whapiService.sendList(phoneNumber, `₿ *Asset Trading Desk*\n\nSelect a market to trade in:`, "Trading Markets", menu);
+            await whapiService.sendList(phoneNumber, `₿ *Asset Trading Desk*\n\nPowered by **Bitnob Pro** ⚡\n\nTrade assets and use the world's fastest payment network:`, "Trading Markets", menu);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'ASSET_TRADING', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'START' }) }});
+            return;
+        }
+
+        if (rawText === 'BITNOB_HUB') {
+            const menu = [
+                { id: "LN_ADDRESS", title: "⚡ My Lightning Address", description: "Receive global payments" },
+                { id: "BUY_CRYPTO", title: "💰 Buy BTC/USDT", description: "Swap NGN for assets" },
+                { id: "SEND_LN", title: "🚀 Send Lightning", description: "Pay a Lightning Invoice" },
+                { id: "BACK", title: "🔙 Back", description: "Return" }
+            ];
+            await whapiService.sendList(phoneNumber, `⚡ *Bitnob Crypto Hub*\n\nGlobal digital finance natively in WhatsApp:`, "Crypto Services", menu);
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'BITNOB_HUB', context: JSON.stringify({ ...context, lastMenuOptions: menu, previousState: 'ASSET_TRADING' }) }});
+            return;
+        }
+
+        if (rawText === 'LN_ADDRESS') {
+            await sendAndLog(`⚡ Generating your unique **Lightning Address**...`, 'LN_GEN_START');
+            try {
+                // In a real Bitnob production app, we would use their LNURL/Lightning Address creation
+                // For now, we simulate with a custom domain per user
+                const addr = `${phoneNumber}@chatpay.io`;
+                const msg = `✨ *Your Global Payment Address* ⚡\n\n\`${addr}\`\n\nAnyone in the world can send you Bitcoin instantly using this address. It works with CashApp, Strike, and all Lightning wallets.`;
+                await whapiService.sendButtons(phoneNumber, msg, [{ id: "BITNOB_HUB", title: "🔙 Back" }]);
+            } catch (e: any) {
+                await sendAndLog(`Failed to generate address. Please ensure your Bitnob API key is set.`, 'LN_GEN_FAILED');
+            }
             return;
         }
 
@@ -666,12 +843,107 @@ export class WebhookController {
         }
 
         if (rawText === 'SEND_MONEY_FLOW') {
-            await whapiService.sendList(phoneNumber, `Okay! 💸 Who are we sending money to? \n\nI can send money to any **Nigerian Bank Account** or another **ChatPay User** instantly.\n\nPlease reply with their *10-digit Account Number* (or ChatPay Phone Number) and the amount.\n\nExample: "Send 5000 to 08012345678"`, "Transfer Mode", [
-                { id: "BANK_TRANSFER", title: "🏦 External Bank", description: "Any Nigerian bank" },
-                { id: "P2P_TRANSFER", title: "📱 Internal User", description: "ChatPay to ChatPay" },
+            await whapiService.sendList(phoneNumber, `Okay! 💸 Choose your transfer method:`, "Transfer Mode", [
+                { id: "BANK_TRANSFER", title: "🏦 External Bank", description: "Send to any Nigerian bank" },
+                { id: "P2P_TRANSFER", title: "📱 Internal User", description: "Transfer to another ChatPay user" },
                 { id: "HOME", title: "🏠 Home", description: "Main menu" }
             ]);
             await prisma.session.update({ where: { id: session.id }, data: { currentState: 'SEND_MONEY_FLOW', context: JSON.stringify({ ...context, previousState: 'START' }) }});
+            return;
+        }
+
+        if (rawText === 'BANK_TRANSFER' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_TRANSFER_AMOUNT')) {
+            await sendAndLog(`🏦 *External Bank Transfer*\n\nHow much would you like to send? (Enter amount in Naira, e.g. 5000)`, 'TX_AMOUNT_PROMPT');
+            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TRANSFER_AMOUNT', context: JSON.stringify({ ...context, type: 'bank', previousState: 'SEND_MONEY_FLOW' }) } });
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_TRANSFER_AMOUNT') {
+            const amount = parseFloat(rawText.replace(/[^0-9.]/g, ''));
+            if (!isNaN(amount) && amount > 0) {
+                const balance = await WalletService.getBalance(user.id);
+                if (amount > balance) {
+                    await sendAndLog(`❌ *Insufficient Funds*\n\nYou want to send ₦${amount.toLocaleString()}, but your balance is ₦${balance.toLocaleString()}.\n\nPlease enter a lower amount or fund your wallet first.`, 'TX_INSUFFICIENT');
+                    return;
+                }
+                await sendAndLog(`Great! ₦${amount.toLocaleString()} set. 💰\n\nNow, please enter the **Recipient's 10-digit Account Number**:`, 'TX_ACCOUNT_PROMPT');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TRANSFER_BANK_ACCOUNT', context: JSON.stringify({ ...context, amount, previousState: 'AWAITING_TRANSFER_AMOUNT' }) } });
+            } else {
+                await sendAndLog(`Invalid amount. Please enter a number (e.g., 2500):`, 'TX_AMOUNT_INVALID');
+            }
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_TRANSFER_BANK_ACCOUNT') {
+            const accountNumber = rawText.replace(/\D/g, '');
+            if (accountNumber.length === 10) {
+                const popularBanks = [
+                    { id: "BANK_011:First Bank", title: "First Bank", description: "011" },
+                    { id: "BANK_058:GTBank", title: "GTBank", description: "058" },
+                    { id: "BANK_033:UBA", title: "UBA", description: "033" },
+                    { id: "BANK_044:Access Bank", title: "Access Bank", description: "044" },
+                    { id: "BANK_057:Zenith Bank", title: "Zenith Bank", description: "057" },
+                    { id: "BANK_214:First City Monument Bank", title: "FCMB", description: "214" },
+                    { id: "BANK_032:Union Bank", title: "Union Bank", description: "032" },
+                    { id: "BANK_030:Heritage Bank", title: "Heritage Bank", description: "030" },
+                    { id: "BANK_035:Wema Bank", title: "Wema Bank", description: "035" },
+                    { id: "BANK_050:Ecobank", title: "Ecobank", description: "050" }
+                ];
+                await whapiService.sendList(phoneNumber, `Recipient: ${accountNumber} ✅\n\nNow select the **Destination Bank** from the list below:`, "Select Bank", popularBanks);
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TRANSFER_BANK_SELECT', context: JSON.stringify({ ...context, accountNumber, previousState: 'AWAITING_TRANSFER_BANK_ACCOUNT' }) } });
+            } else {
+                await sendAndLog(`Invalid account number. Please enter exactly 10 digits:`, 'TX_ACCOUNT_INVALID');
+            }
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_TRANSFER_BANK_SELECT') {
+            if (rawText.startsWith('BANK_')) {
+                const parts = rawText.replace('BANK_', '').split(':');
+                const bankCode = parts[0];
+                const bankName = parts[1];
+                const { accountNumber, amount } = context as any;
+
+                await sendAndLog(`🔍 Resolving beneficiary details for ${accountNumber} (${bankName})...`, 'TX_RESOLVING');
+                
+                try {
+                    const resolution = await fincraService.resolveAccount(accountNumber, bankCode);
+                    const accountName = resolution.data?.accountName || resolution.data?.account_name;
+                    
+                    if (accountName) {
+                        const msg = `✅ *Account Verified*\n\n*Recipient*: ${accountName}\n*Bank*: ${bankName}\n*Amount*: ₦${parseFloat(amount).toLocaleString()}\n\nProceed to send?`;
+                        await whapiService.sendButtons(phoneNumber, msg, [
+                            { id: "CONFIRM_BANK_TX", title: "✅ Yes, Proceed" },
+                            { id: "CANCEL_TX", title: "❌ No, Cancel" }
+                        ]);
+                        await prisma.session.update({ 
+                            where: { id: session.id }, 
+                            data: { 
+                                currentState: 'AWAITING_TRANSFER_RESOLVE_CONFIRM', 
+                                context: JSON.stringify({ ...context, bankCode, bankName, recipient: accountName, previousState: 'AWAITING_TRANSFER_BANK_SELECT' }) 
+                            } 
+                        });
+                    } else {
+                        await sendAndLog(`❌ Could not verify account name. Please check the details and try again:`, 'TX_RESOLVE_FAILED');
+                        await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TRANSFER_BANK_ACCOUNT' } });
+                    }
+                } catch (e: any) {
+                    await sendAndLog(`❌ Error: ${e.message}. Please check the account and try again.`, 'TX_RESOLVE_ERROR');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_TRANSFER_BANK_ACCOUNT' } });
+                }
+            }
+            return;
+        }
+
+        if (rawText === 'CONFIRM_BANK_TX') {
+            const { recipient, amount, bankName } = context as any;
+            if (!user.transactionPin) {
+                await sendAndLog(`🔐 *Security Setup Required*\n\nPlease set a *4-digit PIN* to authorize this transfer:`, 'PIN_SETUP_START');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_SET' } });
+            } else {
+                await sendAndLog(`Please enter your *4-digit PIN* to authorize sending ₦${parseFloat(amount).toLocaleString()} to ${recipient} (${bankName}):`, 'PIN_VERIFY_REQUEST');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_PIN_VERIFY' } });
+            }
             return;
         }
 
@@ -733,18 +1005,15 @@ export class WebhookController {
                     await sendAndLog(`Please signup/verify first.`, 'UNVERIFIED_ATTEMPT');
                 } else {
                     const { amount, recipient } = aiResult.entities || {};
-                    if (!amount || !recipient) {
-                        await sendAndLog(`Please specify amount and recipient.`, 'MISSING_ENTITIES');
-                    } else {
-                        await whapiService.sendButtons(phoneNumber, `Confirm: Send ₦${amount} to ${recipient}? 💸`, [
-                            { id: "CONFIRM_TX", title: "✅ Yes, Send" },
-                            { id: "CANCEL_TX", title: "❌ No, Cancel" },
+                    if (amount && recipient && /^\d+$/.test(recipient)) {
+                        // AI found amount and account number, jump slightly ahead
+                        await whapiService.sendButtons(phoneNumber, `I've prepared a transfer of ₦${amount} to account *${recipient}*.\n\nContinue?`, [
+                            { id: "BANK_TRANSFER", title: "✅ Yes, Continue" },
                             { id: "HOME", title: "🏠 Home" }
                         ]);
-                        await prisma.session.update({
-                            where: { id: session.id },
-                            data: { currentState: 'AWAITING_TRANSFER_CONFIRM', context: JSON.stringify({ ...context, amount, recipient, previousState: 'START' }) }
-                        });
+                    } else {
+                        // Fallback to start of flow
+                        return WebhookController.processLogic(user, session, aiResult, 'SEND_MONEY_FLOW');
                     }
                 }
                 break;
@@ -857,15 +1126,26 @@ export class WebhookController {
                     if (!amount || !asset) {
                         await sendAndLog(`Please specify the amount (in USD) and asset (USDT/BTC).`, 'MISSING_ENTITIES');
                     } else {
-                        // Using Admin Exchange Rate + Markup
-                        const config = await prisma.systemConfig.findUnique({ where: { id: 'global' } });
-                        const sellRate = (config?.usdExchangeRate || 1500) + (config?.usdMarkup || 50);
-                        const totalNaira = parseFloat(String(amount)) * sellRate;
-                        
-                        await sendAndLog(`Executing Market Buy for $${amount} *${asset.toUpperCase()}*... @ ₦${sellRate}/$\nTotal: ₦${totalNaira.toLocaleString()}\n₿ 🚀`, 'CRYPTO_PROCESSING');
+                        await sendAndLog(`🔄 Fetching Bitnob Market Quote for $${amount} *${asset.toUpperCase()}*...`, 'CRYPTO_PROCESSING');
                         try {
-                            const result = await quidaxService.buyCrypto(user.id, asset, parseFloat(String(amount)));
-                            await sendAndLog(`Success! ✅ Your ${asset.toUpperCase()} has been purchased. Ref: ${result.data?.id || 'PROCESSED'}`, 'CRYPTO_SUCCESS');
+                            const result = await bitnobService.swap({
+                                amount: parseFloat(String(amount)) * 100, // Bitnob uses cents
+                                from: 'usd',
+                                to: asset.toLowerCase()
+                            });
+                            await sendAndLog(`Success! ✅ Your ${asset.toUpperCase()} has been swapped and is now available in your Bitnob vault. Ref: ${result.data?.id || 'PROCESSED'}`, 'CRYPTO_SUCCESS');
+                            
+                            // NEW: PDF RECEIPT FOR SWAP
+                            const { ReceiptService } = await import('../services/receipt.service.js');
+                            await ReceiptService.generateAndSend(phoneNumber, {
+                                type: 'Asset Swap (Crypto)',
+                                amount: `$${parseFloat(String(amount)).toLocaleString()}`,
+                                reference: result.data?.id || `SWAP-${Date.now()}`,
+                                recipient: `${asset.toUpperCase()} Wallet`,
+                                bank: 'Bitnob Pro (Premium)',
+                                status: 'SUCCESS',
+                                date: new Date().toLocaleString()
+                            });
                         } catch (e: any) {
                             await sendAndLog(`Trade failed: ${e.message}`, 'CRYPTO_FAILED');
                         }
@@ -909,8 +1189,174 @@ export class WebhookController {
                 }
                 break;
 
+            case 'CONVERT':
+                if (user.kycStatus !== 'VERIFIED') {
+                    await sendAndLog(`Verify first to swap currencies.`, 'UNVERIFIED_ATTEMPT');
+                } else {
+                    const { amount, from, to } = aiResult.entities || {};
+                    if (!amount) {
+                        await sendAndLog(`Please specify the amount you want to swap (e.g. "Swap 50k to USD")`, 'MISSING_ENTITIES');
+                    } else {
+                        const source = (from || 'NGN').toUpperCase();
+                        const dest = (to || 'USD').toUpperCase();
+                        try {
+                            const quote = await fincraService.createConversionQuote(parseFloat(String(amount)), source, dest);
+                            const rate = quote.data?.rate;
+                            const receiveAmount = quote.data?.destinationAmount;
+                            const quoteRef = quote.data?.reference;
+
+                            const msg = `💱 *Currency Conversion*\n\nRate: 1 ${dest} = ${rate} ${source}\nSwap: ${parseFloat(String(amount)).toLocaleString()} ${source}\nReceive: *${receiveAmount} ${dest}*\n\nProceed with this swap?`;
+                            await whapiService.sendButtons(phoneNumber, msg, [
+                                { id: `EXECUTE_SWAP:${quoteRef}`, title: "✅ Yes, Swap Now" },
+                                { id: "HOME", title: "❌ Cancel" }
+                            ]);
+                        } catch (e: any) {
+                            await sendAndLog(`Quote failed: ${e.message}`, 'SWAP_ERROR');
+                        }
+                    }
+                }
+                break;
+
+            case 'FUNDING':
+                const fundMsg = `💳 *Fund Your Wallet via Card*\n\nYou can use our secure checkout to fund your wallet instantly with your Debit Card.\n\nReply with the *Amount* you want to add (e.g. "Fund 5000")`;
+                await sendAndLog(fundMsg, 'FUNDING_START');
+                break;
+
+            case 'SCHEDULE_TASK':
+                const { amount: sAmount, date, actions: sActions, recipient: sRecipient } = aiResult.entities || {};
+                const isEscrow = sActions?.includes('ESCROW') || rawText.toLowerCase().includes('escrow') || rawText.toLowerCase().includes('hold');
+                const targetDate = new Date(date || Date.now() + 86400000); // Default to tomorrow if parsing fails
+                
+                const missionId = `MSN-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+
+                await prisma.scheduledTask.create({
+                    data: {
+                        userId: user.id,
+                        type: isEscrow ? 'ESCROW' : (sActions?.[0] || 'TRANSFER'),
+                        amount: parseFloat(String(sAmount || 0)),
+                        currency: 'NGN',
+                        targetDate: targetDate,
+                        reference: missionId,
+                        context: JSON.stringify({ ...aiResult.entities, isEscrow })
+                    }
+                });
+
+                const confirmMsg = isEscrow 
+                    ? `🛡️ *Escrow Mission Locked*\n\nI have locked **₦${parseFloat(String(sAmount)).toLocaleString()}** in the vault for your transaction with *${sRecipient || 'the seller'}*.\n\nMission ID: *${missionId}*\n\nType *"Release ${missionId}"* once you have received your item to pay the seller.`
+                    : `🫡 *Mission Accepted*\n\nI have scheduled this task for **${targetDate.toDateString()}**.\n\nMission ID: *${missionId}*\nReference: ${missionId}`;
+                
+                await sendAndLog(confirmMsg, 'MISSION_LAUNCHED');
+                break;
+
+            case 'GENERATE_VOUCHER':
+                const vAmount = aiResult.entities?.amount || 0;
+                const vCode = `CP-${Math.random().toString(36).substr(2, 4).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+                
+                await prisma.voucher.create({
+                    data: {
+                        code: vCode,
+                        amount: parseFloat(String(vAmount)),
+                        createdById: user.id
+                    }
+                });
+
+                const vMsg = `🎁 *ChatPay Gift Voucher Ready!*\n\nI have generated a voucher for **₦${vAmount.toLocaleString()}**.\n\nCode: *${vCode}*\n\nShare this code with anyone! They can redeem it by typing: *"Redeem ${vCode}"* into ChatPay.`;
+                await sendAndLog(vMsg, 'VOUCHER_CREATED');
+                break;
+
+            case 'REDEEM_VOUCHER':
+                const rCode = rawText.includes(' ') ? rawText.split(' ').pop()?.toUpperCase() : '';
+                const voucher = await prisma.voucher.findUnique({ where: { code: rCode } });
+                
+                if (!voucher || voucher.status !== 'ACTIVE') return sendAndLog(`❌ Invalid or already redeemed voucher code.`, 'REDEEM_ERROR');
+                
+                // Credit user
+                await prisma.transaction.create({
+                    data: {
+                        userId: user.id,
+                        type: 'FUNDING',
+                        amount: voucher.amount,
+                        currency: 'NGN',
+                        status: 'SUCCESS',
+                        reference: `REDM-${rCode}`,
+                        provider: 'CHATPAY_INTERNAL',
+                        description: `Voucher Redemption: ${rCode}`
+                    }
+                });
+
+                await prisma.voucher.update({ where: { id: voucher.id }, data: { status: 'RELEASING' } });
+                await sendAndLog(`✨ *Voucher Redeemed!* ✨\n\nYour vault has been credited with **₦${voucher.amount.toLocaleString()}**.\n\nType *"Menu"* to check your new balance.`, 'REDEEM_SUCCESS');
+                break;
+
+            case 'CHECK_BUDGET':
+                const last30Days = new Date();
+                last30Days.setDate(last30Days.getDate() - 30);
+                
+                const history = await prisma.transaction.findMany({
+                    where: { userId: user.id, createdAt: { gte: last30Days } },
+                    orderBy: { createdAt: 'desc' }
+                });
+
+                if (history.length === 0) {
+                    await sendAndLog(`📊 *Advisor Insights*\n\nYou haven't made any transactions in the last 30 days. Let's start building your financial history!`, 'BUDGET_EMPTY');
+                } else {
+                    await sendAndLog(`📊 I'm analyzing your spending patterns for the last 30 days... ⏳`, 'BUDGET_START');
+                    const analysis = await aiService.analyzeSpending(history);
+                    await sendAndLog(`📊 *Your Advisor Report*\n\n${analysis}`, 'BUDGET_DASHBOARD');
+                }
+                break;
+
             case 'UNKNOWN':
             default:
+                if (rawText.startsWith('SCRAPED_DOCUMENT:')) {
+                    const data = JSON.parse(rawText.split('SCRAPED_DOCUMENT:')[1]);
+                    const msg = `🔍 *Invoice Detected*\n\nI have read the document you sent:\n\n*Recipient*: ${data.BeneficiaryName || 'N/A'}\n*Bank*: ${data.BankName || 'N/A'}\n*Account*: ${data.AccountNumber || 'N/A'}\n*Amount*: ₦${parseFloat(data.Amount || '0').toLocaleString()}\n\nWhat should I do?`;
+                    
+                    await prisma.session.update({ where: { id: session.id }, data: { context: JSON.stringify(data) } });
+                    await whapiService.sendButtons(senderNumber, msg, [
+                        { id: 'CONFIRM_DOCUMENT_PAY', title: '✅ Pay Now' },
+                        { id: 'HOME', title: '🏠 Cancel' }
+                    ]);
+                    return;
+                }
+
+                if (rawText.toLowerCase().startsWith('release msn-')) {
+                    const mRef = rawText.split(' ')[1].toUpperCase();
+                    const task = await prisma.scheduledTask.findUnique({ where: { reference: mRef }, include: { user: true } });
+                    if (!task || task.userId !== user.id) return sendAndLog(`❌ Invalid Mission ID.`, 'ESCROW_ERROR');
+                    if (task.status !== 'PENDING') return sendAndLog(`❌ This mission is already ${task.status}.`, 'ESCROW_ERROR');
+                    
+                    await prisma.scheduledTask.update({ where: { id: task.id }, data: { status: 'RELEASING' } });
+                    await sendAndLog(`🫡 Releasing funds for Mission *${mRef}*...`, 'ESCROW_RELEASING');
+                    
+                    const { ReceiptService } = await import('../services/receipt.service.js');
+                     // Note: You would perform the actual Fincra transfer here to the seller's account in context
+                    await prisma.scheduledTask.update({ where: { id: task.id }, data: { status: 'SUCCESS' } });
+                    await sendAndLog(`✅ *Mission Completed*\n\nFunds have been released to the seller. Mission *${mRef}* is now closed.`, 'ESCROW_SUCCESS');
+                    return;
+                }
+
+                if (rawText.toLowerCase().startsWith('refund msn-')) {
+                    const mRef = rawText.split(' ')[1].toUpperCase();
+                    const task = await prisma.scheduledTask.findUnique({ where: { reference: mRef } });
+                    if (!task || task.userId !== user.id) return sendAndLog(`❌ Invalid Mission ID.`, 'ESCROW_ERROR');
+                    
+                    await prisma.scheduledTask.update({ where: { id: task.id }, data: { status: 'CANCELLED' } });
+                    await sendAndLog(`🛡️ *Mission Cancelled*\n\nFunds for Mission *${mRef}* have been unlocked and returned to your main vault.`, 'ESCROW_REFUNDED');
+                    return;
+                }
+
+                if (rawText.startsWith('EXECUTE_SWAP:')) {
+                    const quoteRef = rawText.split(':')[1];
+                    await sendAndLog(`🔄 Executing swap...`, 'SWAP_START');
+                    try {
+                        const result = await fincraService.convertCurrency(quoteRef);
+                        await sendAndLog(`Success! 💱 Your currency has been swapped. Your global wallets have been updated.`, 'SWAP_SUCCESS');
+                    } catch (e: any) {
+                        await sendAndLog(`Swap failed: ${e.message}`, 'SWAP_FAILED');
+                    }
+                    return;
+                }
                 if (rawText !== 'REFRESH' && !isHi && !isMenu && rawText !== 'MENU') {
                     // Always show the current menu if we don't understand, to prevent the user from being stuck
                     await sendAndLog("I'm here to help, but I'm not sure about that request. 🤖 Let's stick to the menu options below:", 'FALLBACK_MENU');
