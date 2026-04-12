@@ -339,37 +339,37 @@ export class WebhookController {
             
             if (!isVerified) {
                 const welcomeMsg = `👋 Welcome to ChatPay!\nI am your personal money assistant right here on WhatsApp.\n\nI can help you:\n🏦 *Bank:* Get local & dollar accounts\n🚀 *Send:* Transfer money locally & abroad\n💡 *Bills:* Pay airtime, data & electricity\n🎮 *Betting:* Fund your bet accounts instantly\n₿ *Crypto:* Trade Bitcoin & Dollar Cards\n🤝 *Trust:* Hold money safely (Escrow)\n\nTo get started, are you opening this account for *Yourself* or for a *Registered Business*?`;
-                const welcomeMenu = [
-                    { id: "START_INDIVIDUAL", title: "👤 For Myself", description: "Personal local & global account" },
-                    { id: "START_BUSINESS", title: "💼 For a Business", description: "Registered company account" }
-                ];
-                try {
-                    await whapiService.sendList(phoneNumber, welcomeMsg, "🚀 Get Started", welcomeMenu);
-                } catch (e) {
-                    await whapiService.sendMessage(phoneNumber, welcomeMsg);
-                }
+                await sendAndLog(welcomeMsg, 'SIGNUP_START');
                 await prisma.session.update({ 
                     where: { id: session.id }, 
-                    data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: welcomeMenu }) } 
+                    data: { currentState: 'AWAITING_ACCOUNT_TYPE', context: JSON.stringify({ ...context }) } 
                 });
             } else {
                 // Existing Verified Users - AGENTIC EXPERIENCE
-                const menuTxt = `🤖 *Status: Agent Active* 🤖\n\nWelcome back to your secure vault. I am standing by for your next mission.\n\nWhat should I execute for you?`;
-                const mainMenu = [
-                    { id: "CHECK_BALANCE", title: "💰 Vault Balance", description: "View your current funds" },
-                    { id: "FUND_WALLET", title: "🏦 Receive Funds", description: "Get your global AC numbers" },
-                    { id: "SEND_MONEY", title: "💸 Launch Transfer", description: "Transfer to any bank or user" },
-                    { id: "PAY_BILLS", title: "💡 Settle Bills", description: "Airtime, Data, Power, TV" },
-                    { id: "CARD_MENU", title: "💳 Card Vault", description: "Access your 3DS Virtual Cards" },
-                    { id: "ASSET_TRADING", title: "₿ Asset Hub", description: "Buy/Sell & Auto-Buy Crypto" },
-                    { id: "CHECK_BUDGET", title: "📊 Advisor Report", description: "AI Insight into your spending" },
-                    { id: "HOME", title: "🏠 Refresh Agent", description: "Refresh this mission menu" }
-                ];
-                await whapiService.sendList(user.phoneNumber, menuTxt, "🚀 Mission Center", mainMenu);
+                const blnce = await WalletService.getBalance(user.id);
+                const welcomeMsg = `Welcome back, ${user.name || 'friend'}! 👋\n\nYour available balance is ₦${blnce.toLocaleString()}.\n\nWould you like to send money, fund a betting account, pay a bill, or trade some crypto today?`;
+                await sendAndLog(welcomeMsg, 'SIGNUP_EXISTS');
                 await prisma.session.update({ 
                     where: { id: session.id }, 
-                    data: { currentState: 'START', context: JSON.stringify({ ...context, lastMenuOptions: mainMenu, previousState: null }) } 
+                    data: { currentState: 'START', context: JSON.stringify({ ...context, previousState: null }) } 
                 });
+            }
+            return;
+        }
+
+        if (session.currentState === 'AWAITING_ACCOUNT_TYPE' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_ACCOUNT_TYPE')) {
+            const reply = rawText.toLowerCase();
+            if (reply.includes('myself') || reply.includes('personal') || reply.includes('individual') || reply.includes('me') || reply === '1') {
+                await sendAndLog(`Great! Let's set up your personal account. What is your full legal name?`, 'SIGNUP_NAME_PROMPT');
+                await prisma.session.update({ 
+                    where: { id: session.id }, 
+                    data: { currentState: 'AWAITING_NAME', context: JSON.stringify({ ...context, type: 'individual', previousState: 'AWAITING_ACCOUNT_TYPE' }) } 
+                });
+            } else if (reply.includes('business') || reply.includes('company') || reply === '2') {
+                await sendAndLog(`Understood. To setup your *Business Account*, please provide your **Registered Business Name**:`, 'SIGNUP_BUSINESS_NAME_PROMPT');
+                await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business', previousState: 'AWAITING_ACCOUNT_TYPE' }) } });
+            } else {
+                await sendAndLog(`Are you opening this account for *Yourself* or for a *Registered Business*?`, 'SIGNUP_RETRY_TYPE');
             }
             return;
         }
@@ -384,21 +384,7 @@ export class WebhookController {
             return;
         }
 
-        if (rawText === 'START_INDIVIDUAL') {
-            await sendAndLog(`Great! Let's set up your personal account. What is your full legal name?`, 'SIGNUP_NAME_PROMPT');
-            await prisma.session.update({ 
-                where: { id: session.id }, 
-                data: { currentState: 'AWAITING_NAME', context: JSON.stringify({ ...context, type: 'individual', previousState: 'START' }) } 
-            });
-            return;
-        }
 
-        if (rawText === 'START_BUSINESS') {
-            const userName = user.name || context.name;
-            await sendAndLog(`Understood. To setup your *Business Account*, please provide your **Registered Business Name**:`, 'SIGNUP_BUSINESS_NAME_PROMPT');
-            await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_BUSINESS_NAME', context: JSON.stringify({ ...context, type: 'business' }) } });
-            return;
-        }
 
         if (session.currentState === 'AWAITING_INDIVIDUAL_NAME' || (rawText === 'REFRESH' && session.currentState === 'AWAITING_INDIVIDUAL_NAME')) {
             if (rawText !== 'REFRESH') {
@@ -1091,11 +1077,8 @@ export class WebhookController {
                     await sendAndLog(`Welcome back, ${user.name || 'friend'}! 👋\n\nYour available balance is ₦${blnce.toLocaleString()}.\n\nWould you like to send money, fund a betting account, pay a bill, or trade some crypto today?`, 'SIGNUP_EXISTS');
                 } else {
                     const welcomeMsg = `👋 Welcome to ChatPay!\nI am your personal money assistant right here on WhatsApp.\n\nI can help you:\n🏦 *Bank:* Get local & dollar accounts\n🚀 *Send:* Transfer money locally & abroad\n💡 *Bills:* Pay airtime, data & electricity\n🎮 *Betting:* Fund your bet accounts instantly\n₿ *Crypto:* Trade Bitcoin & Dollar Cards\n🤝 *Trust:* Hold money safely (Escrow)\n\nTo get started, are you opening this account for *Yourself* or for a *Registered Business*?`;
-                    await whapiService.sendList(phoneNumber, welcomeMsg, "Select Type", [
-                        { id: "START_INDIVIDUAL", title: "👤 For Myself", description: "Personal local & global account" },
-                        { id: "START_BUSINESS", title: "💼 For a Business", description: "Registered company account" }
-                    ]);
-                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START' } });
+                    await sendAndLog(welcomeMsg, 'SIGNUP_START');
+                    await prisma.session.update({ where: { id: session.id }, data: { currentState: 'AWAITING_ACCOUNT_TYPE' } });
                 }
                 break;
 
