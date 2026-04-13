@@ -30,8 +30,8 @@ export class SyncService {
             // 1. SYNC COLLECTIONS (Incoming)
             while (page <= depth) {
                 console.log(`[SyncService] Fetching Fincra Collections Page ${page}...`);
-                // Standardize on 'perPage' as Fincra strict-validates query params
-                const url = `https://api.fincra.com/collections?business=${businessId}&page=${page}&perPage=50`;
+                // Rely on 'x-business-id' header instead of query param to avoid 422 Payload Conflict
+                const url = `https://api.fincra.com/collections?page=${page}&perPage=20`;
                 const response = await axios.get(url, { headers });
                 const rawData = response.data.data;
                 const collections = Array.isArray(rawData) ? rawData : (rawData?.result || rawData?.collections || []);
@@ -103,7 +103,7 @@ export class SyncService {
             let dPage = 1;
             while (dPage <= depth) {
                 console.log(`[SyncService] Fetching Fincra Payouts Page ${dPage}...`);
-                const dUrl = `https://api.fincra.com/disbursements?business=${businessId}&page=${dPage}&perPage=50`;
+                const dUrl = `https://api.fincra.com/disbursements?page=${dPage}&perPage=20`;
                 try {
                     const dRes = await axios.get(dUrl, { headers });
                     const dData = dRes.data.data?.result || dRes.data.data || [];
