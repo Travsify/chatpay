@@ -70,11 +70,15 @@ export class FincraService {
                 currency: data.currency || 'NGN',
                 accountType: data.accountType,
                 KYCInformation: {
-                    firstName: data.firstName,
-                    lastName: data.lastName,
                     email: data.email,
-                }
+                } as any
             };
+
+            // Only include first/last name for individual accounts
+            if (data.accountType === 'individual') {
+                payload.KYCInformation.firstName = data.firstName;
+                payload.KYCInformation.lastName = data.lastName;
+            }
 
             if (data.customerId) {
                 payload.customerId = data.customerId;

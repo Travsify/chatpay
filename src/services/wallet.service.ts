@@ -87,8 +87,9 @@ export class WalletService {
                     const reference = `chatpay-${user.id.slice(0, 8)}-${currency.toLowerCase()}`;
                     const accounts = await fincraService.listVirtualAccounts(currency.toLowerCase());
                     
-                    // Fincra returns { success: true, data: [...] }
-                    const existing = accounts.data?.find((a: any) => a.merchantReference === reference);
+                    // Fincra returns either { data: [...] } or { data: { results: [...] } }
+                    const rawList = accounts.data?.results || accounts.data || [];
+                    const existing = Array.isArray(rawList) ? rawList.find((a: any) => a.merchantReference === reference) : null;
                     
                     if (existing) {
                         console.log(`[Wallet] Recovery successful! Found existing account: ${existing.accountNumber}`);
