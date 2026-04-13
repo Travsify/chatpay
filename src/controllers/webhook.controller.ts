@@ -413,8 +413,15 @@ export class WebhookController {
             const isVerified = user.kycStatus === 'VERIFIED' && user.fincraWalletId;
             
             if (!isVerified) {
-                const welcomeMsg = `👋 Welcome to ChatPay!\nI am your personal money assistant right here on WhatsApp.\n\nI can help you:\n🏦 *Bank:* Get local & dollar accounts\n🚀 *Send:* Transfer money locally & abroad\n💡 *Bills:* Pay airtime, data & electricity\n🎮 *Betting:* Fund your bet accounts instantly\n₿ *Crypto:* Trade Bitcoin & Dollar Cards\n🤝 *Trust:* Hold money safely (Escrow)\n\nTo get started, are you opening this account for *Yourself* or for a *Registered Business*?`;
-                await sendAndLog(welcomeMsg, 'SIGNUP_START');
+                const welcomeMsg = `👋 Welcome to ChatPay!\nI am your personal money assistant right here on WhatsApp.\n\nI can help you bank, send money, pay bills, and trade crypto instantly.\n\nTo get started, are you opening this account for *Yourself* or for a *Registered Business*?`;
+                try {
+                    await provider.sendButtons!(phoneNumber, welcomeMsg, [
+                        { id: 'START_INDIVIDUAL', title: '👤 For Myself' },
+                        { id: 'START_BUSINESS', title: '💼 For Business' }
+                    ]);
+                } catch (e) {
+                    await sendAndLog(welcomeMsg, 'SIGNUP_START');
+                }
                 await prisma.session.update({ 
                     where: { id: session.id }, 
                     data: { currentState: 'AWAITING_ACCOUNT_TYPE', context: JSON.stringify({ ...context }) } 
@@ -422,8 +429,30 @@ export class WebhookController {
             } else {
                 // Existing Verified Users - AGENTIC EXPERIENCE
                 const blnce = await WalletService.getBalance(user.id);
-                const welcomeMsg = `Welcome back, ${user.name || 'friend'}! 👋\n\nYour available balance is ₦${blnce.toLocaleString()}.\n\nWould you like to send money, fund a betting account, pay a bill, or trade some crypto today?`;
-                await sendAndLog(welcomeMsg, 'SIGNUP_EXISTS');
+                const welcomeMsg = `Welcome back, ${user.name || 'friend'}! 👋\n\nYour available balance is ₦${blnce.toLocaleString()}.\n\nWhat would you like to do today?`;
+                const menu = [
+                    { title: "Banking & Transfers", rows: [
+                        { id: "CHECK_BALANCE", title: "💰 Check Balance", description: "View your vault and account details" },
+                        { id: "SEND_MONEY_FLOW", title: "💸 Send Money", description: "Transfer to bank or internal user" },
+                        { id: "FUND_WALLET", title: "🏦 Fund Wallet", description: "See deposit instructions" }
+                    ]},
+                    { title: "Lifestyle & Utilities", rows: [
+                        { id: "PAY_BILLS", title: "💡 Pay Bills", description: "Airtime, Data, TV, Electricity" },
+                        { id: "CARD_MENU", title: "💳 Virtual Cards", description: "USD Master/Visa for shopping" },
+                        { id: "BETTING_MENU", title: "🎮 Fund Betting", description: "SportyBet, Bet9ja, etc." }
+                    ]},
+                    { title: "Advanced Features", rows: [
+                        { id: "ASSET_TRADING", title: "₿ Asset Trading", description: "Buy/Sell BTC & Stablecoins" },
+                        { id: "GLOBAL_ACCOUNTS", title: "🌍 Global Accounts", description: "US/UK/EU banking details" }
+                    ]}
+                ];
+
+                try {
+                    await provider.sendList!(phoneNumber, welcomeMsg, "Main Menu", "Select Action", menu);
+                } catch (e) {
+                    await sendAndLog(welcomeMsg, 'SIGNUP_EXISTS');
+                }
+                
                 await prisma.session.update({ 
                     where: { id: session.id }, 
                     data: { currentState: 'START', context: JSON.stringify({ ...context, previousState: null }) } 
