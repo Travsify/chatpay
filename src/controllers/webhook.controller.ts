@@ -17,7 +17,7 @@ import crypto from 'crypto';
 interface MessagingProvider {
     sendMessage(to: string, body: string): Promise<any>;
     sendButtons?(to: string, body: string, buttons: any[]): Promise<any>;
-    sendList?(to: string, body: string, title: string, buttonText: string, sections: any[]): Promise<any>;
+    sendList?(to: string, body: string, buttonText: string, sections: any[]): Promise<any>;
     sendImage?(to: string, mediaUrl: string, caption?: string): Promise<any>;
 }
 
@@ -244,7 +244,7 @@ export class WebhookController {
         const webProvider: MessagingProvider = {
             sendMessage: async (to, body) => { collected.push({ type: 'text', body }); },
             sendButtons: async (to, body, buttons) => { collected.push({ type: 'buttons', body, buttons }); },
-            sendList: async (to, body, title, buttonText, sections) => { collected.push({ type: 'list', body, title, buttonText, sections }); },
+            sendList: async (to, body, buttonText, sections) => { collected.push({ type: 'list', body, title: buttonText, sections }); },
             sendImage: async (to, url, caption) => { collected.push({ type: 'image', url, caption }); }
         };
 
@@ -358,7 +358,7 @@ export class WebhookController {
         const bankingCommands = ['CHECK_BALANCE', 'FUND_WALLET', 'SEND_MONEY', 'PAY_BILLS', 'CARD_MENU', 'ASSET_TRADING', 'GLOBAL_ACCOUNTS', 'GLOBAL_WALLETS'];
         if (bankingCommands.includes(rawText) && user.kycStatus !== 'VERIFIED') {
             await sendAndLog(`🔐 *Security Guard:* You must complete your account activation before accessing banking features.`, 'KYC_REQUIRED');
-            return WebhookController.processLogic(user, session, aiResult, 'MENU');
+            return WebhookController.processLogic(user, session, aiResult, 'MENU', provider);
         }
 
         // 0. Global Priority Commands (Reset, Menu, Help)
@@ -394,7 +394,7 @@ export class WebhookController {
                 data: { currentState: context.previousState, context: JSON.stringify({ ...context, previousState: null }) } 
             });
             // Re-trigger logic with empty text to refresh the previous state's prompt
-            return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'REFRESH');
+            return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'REFRESH', provider);
         }
 
         if (rawText === 'START_ONBOARDING' || rawText === 'OPEN_ACCOUNT') {
@@ -448,7 +448,7 @@ export class WebhookController {
                 ];
 
                 try {
-                    await provider.sendList!(phoneNumber, welcomeMsg, "Main Menu", "Select Action", menu);
+                    await provider.sendList!(phoneNumber, welcomeMsg, "Main Menu", menu);
                 } catch (e) {
                     await sendAndLog(welcomeMsg, 'SIGNUP_EXISTS');
                 }
@@ -945,7 +945,7 @@ export class WebhookController {
         if (session.currentState === 'AWAITING_BILL_INPUT') {
             if (rawText === 'BACK' || rawText === 'HOME') {
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', context: null } });
-                return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, rawText === 'HOME' ? 'Menu' : 'PAY_BILLS');
+                return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, rawText === 'HOME' ? 'Menu' : 'PAY_BILLS', provider);
             }
             const billParts = rawText.trim().split(/\s+/);
             const customerIdentifier = billParts[0];
@@ -1089,7 +1089,7 @@ export class WebhookController {
                 await sendAndLog(`✅ *Re-authenticated!*\n\n🗑️ *Delete your PIN message now* — Long-press → Delete for Everyone.\n\nHow can I help you today?`, 'REAUTH_SUCCESS');
                 await prisma.session.update({ where: { id: session.id }, data: { currentState: 'START', updatedAt: now } });
                 // Re-trigger the menu
-                return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'Menu');
+                return WebhookController.processLogic(user, await prisma.session.findUnique({where:{id:session.id}}), aiResult, 'Menu', provider);
             } else {
                 await sendAndLog(`❌ Incorrect PIN.\n\n🗑️ *Delete your PIN message now* for safety, then try again or type *'Reset'* if you forgot it:`, 'REAUTH_FAILED');
                 return;
@@ -1257,7 +1257,7 @@ export class WebhookController {
                 }
             });
             const updatedSession = await prisma.session.findUnique({where:{id:session.id}});
-            return WebhookController.processLogic(user, updatedSession, { intent: 'UNKNOWN' }, 'CONFIRM_TX');
+            return WebhookController.processLogic(user, updatedSession, { intent: 'UNKNOWN' }, 'CONFIRM_TX', provider);
         }
 
         if (rawText === 'CONFIRM_BANK_TX') {
@@ -1348,7 +1348,7 @@ export class WebhookController {
                         ]);
                     } else {
                         // Fallback to start of flow
-                        return WebhookController.processLogic(user, session, aiResult, 'SEND_MONEY_FLOW');
+                        return WebhookController.processLogic(user, session, aiResult, 'SEND_MONEY_FLOW', provider);
                     }
                 }
                 break;
@@ -1544,7 +1544,7 @@ export class WebhookController {
                 if (user.kycStatus !== 'VERIFIED') {
                     // Redirect unverified users to signup instead of dead-ending
                     await sendAndLog(`Let's get you set up first! 🏦 I'll guide you through account activation.`, 'ACCOUNT_ONBOARD_REDIRECT');
-                    return WebhookController.processLogic(user, session, aiResult, 'START_ONBOARDING');
+                    return WebhookController.processLogic(user, session, aiResult, 'START_ONBOARDING', provider);
                 } else {
                     const { currency } = aiResult.entities || {};
                     if (!currency) {
