@@ -217,29 +217,17 @@ export class FincraService {
      * CONVERSIONS: Get a quote for swapping currency (e.g. NGN to USD)
      */
     async createConversionQuote(amount: number, from: string, to: string) {
-        const baseUrl = this.getBaseUrl();
-        const payload = {
-            amount,
-            sourceCurrency: from,
-            destinationCurrency: to
-        };
-        const headers = await this.getHeaders();
-
         try {
-            // Primary endpoint (V1/V2 standard)
-            const response = await axios.post(`${baseUrl}/conversions/quotes`, payload, { headers });
+            const baseUrl = this.getBaseUrl();
+            const response = await axios.post(`${baseUrl}/v1/conversions/quotes`, {
+                amount,
+                sourceCurrency: from,
+                destinationCurrency: to
+            }, {
+                headers: await this.getHeaders()
+            });
             return response.data;
         } catch (error: any) {
-            if (error.response?.status === 404) {
-                try {
-                    console.log('[Fincra] /conversions/quotes not found, trying fallback /quotes...');
-                    const response = await axios.post(`${baseUrl}/quotes`, payload, { headers });
-                    return response.data;
-                } catch (e: any) {
-                    console.error('[Fincra] Fallback conversion failed:', e.response?.data || e.message);
-                    throw new Error('Exchange rate service unavailable');
-                }
-            }
             console.error('[Fincra] Conversion Quote Error:', error.response?.data || error.message);
             throw new Error(error.response?.data?.message || 'Failed to get exchange rate');
         }
